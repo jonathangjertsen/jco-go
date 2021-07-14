@@ -148,6 +148,12 @@ func BinaryOp(a, b []byte, elemfunc func(ai, bi byte) byte) []byte {
 	return c
 }
 
+// Returns the input with the bit order reversed
+// Leading zeros in the output (due to trailing zeros in the input) are NOT removed
+func BitReverse(input []byte) []byte {
+	return UnaryOp(ByteReverse(input), bits.Reverse8)
+}
+
 // Returns the binary string representation of the bytes
 func BytesToBin(a []byte, nBytes uint) string {
 	parts := []byte("0b")
@@ -360,6 +366,11 @@ func ShiftLeft(a, b []byte) []byte {
 	}
 
 	return a
+}
+
+// Returns a << b
+func ShiftRight(a, b []byte) []byte {
+	return BitReverse(ShiftLeft(BitReverse(a), b))
 }
 
 // Parses the input string to a byte array

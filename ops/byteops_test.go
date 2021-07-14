@@ -723,7 +723,79 @@ func TestShiftLeft(t *testing.T) {
 	check(t, func(a, b []byte) bool {
 		return LeftIsGreaterOrEqual(a, ShiftLeft(a, b))
 	})
+}
 
+func TestShiftRight(t *testing.T) {
+	var vector = []struct {
+		a    []byte
+		b    []byte
+		want []byte
+	}{
+		{
+			[]byte{0, 0, 0, 0},
+			[]byte{0},
+			[]byte{0, 0, 0, 0},
+		},
+		{
+			[]byte{},
+			[]byte{0x4},
+			[]byte{},
+		},
+		{
+			[]byte{0x10, 0x10},
+			[]byte{0x4},
+			[]byte{0x01, 0x00},
+		},
+		{
+			[]byte{0x1f, 0x10},
+			[]byte{0x3},
+			[]byte{0xf8, 0x80},
+		},
+		{
+			[]byte{0x4a},
+			[]byte{0x5},
+			[]byte{0x40},
+		},
+		{
+			[]byte{0x4a, 0xef, 0xae},
+			[]byte{0x5},
+			[]byte{0x5d, 0xf5, 0xc0},
+		},
+		{
+			[]byte{0x4a, 0xef, 0xae},
+			[]byte{0x4},
+			[]byte{0xae, 0xfa, 0xe0},
+		},
+		{
+			[]byte{0x4a, 0xef, 0xae},
+			[]byte{0x8},
+			[]byte{0xef, 0xae, 0x00},
+		},
+		{
+			[]byte{0x00, 0x0f},
+			[]byte{0x12},
+			[]byte{0x00, 0x00},
+		},
+		{
+			[]byte{0xff, 0xff},
+			[]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+			[]byte{0x00, 0x00},
+		},
+	}
+	for _, tt := range vector {
+		testname := fmt.Sprintf("%v,%v\n", tt.a, tt.b)
+		t.Run(testname, func(t *testing.T) {
+			have := ShiftRight(tt.a, tt.b)
+			if !bytes.Equal(have, tt.want) {
+				t.Errorf("Want %v, have %v\n", tt.want, have)
+			}
+		})
+	}
+
+	// Property: ShiftLeft has same length as input
+	check(t, func(a, b []byte) bool {
+		return len(ShiftLeft(a, b)) == len(a)
+	})
 }
 
 func TestStringToBytes(t *testing.T) {
