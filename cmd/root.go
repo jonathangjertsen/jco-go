@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"github.com/jonathangjertsen/jco-go/ops"
 	"github.com/jonathangjertsen/jco-go/table"
-	"github.com/spf13/cobra"
 	"math/big"
+	"os"
 	"strconv"
 )
 
 const (
-	version = "v0.1.0"
+	VERSION = "v0.1.0"
 )
 
 type Flags struct {
@@ -21,52 +21,6 @@ type Flags struct {
 	numbersAsWritten []string
 }
 
-var RootCmd = &cobra.Command{
-	Use:   "jco",
-	Short: fmt.Sprintf("jco %s", version),
-	Long:  fmt.Sprintf("jco (Jonathan's converter) %s", version),
-	Run: func(cmd *cobra.Command, args []string) {
-		flags := parseFlags(args)
-		if flags.version {
-			fmt.Printf(cmd.Short)
-			return
-		}
-		if flags.help {
-			cmd.Usage()
-			return
-		}
-		t := table.NewTable(flags.bits)
-
-		switch len(flags.numbers) {
-		case 0:
-			cmd.Usage()
-			return
-		case 1:
-			t.One(
-				flags.numbers[0],
-				flags.numbersAsWritten[0],
-			)
-		case 2:
-			t.Two(
-				flags.numbers[0],
-				flags.numbers[1],
-				flags.numbersAsWritten[0],
-				flags.numbersAsWritten[1],
-			)
-		default:
-		}
-		t.Render()
-	},
-	Version:           version,
-	DisableAutoGenTag: true,
-}
-
-func init() {
-	RootCmd.Flags().UintP("bits", "b", 32, "Number of bits")
-}
-
-// Custom flag parsing because Cobra does not want to support negative numbers:
-// 	 https://github.com/spf13/cobra/issues/124
 func parseFlags(args []string) *Flags {
 	flags := Flags{}
 	opts := map[string]string{
@@ -121,13 +75,63 @@ func parseFlags(args []string) *Flags {
 	return &flags
 }
 
+func Version() {
+	fmt.Printf("jco %s", VERSION)
+}
+
+func Usage() {
+	fmt.Printf(`jco (Jonathan's converter) %s
+
+Usage:
+	Show information about <number>
+		jco <number>
+
+	Show information about how <number1> and <number2> relate
+		jco <number1> <number2>
+
+	Like the above, but treat numbers as 16-bit
+		jco <number1> <number2> -b 16
+
+	Show this help screen
+		jco --help
+
+	Show one-liner version
+		jco --version
+`, VERSION)
+}
+
 func Execute() {
-	cobra.MousetrapHelpText = ""
-	RootCmd.CompletionOptions.DisableDefaultCmd = true
-	RootCmd.DisableFlagParsing = true
-	if err := RootCmd.Execute(); err != nil {
-		Fatal(err.Error())
+	args := os.Args[1:]
+	flags := parseFlags(args)
+	if flags.version {
+		Version()
+		return
 	}
+	if flags.help {
+		Usage()
+		return
+	}
+	t := table.NewTable(flags.bits)
+
+	switch len(flags.numbers) {
+	case 0:
+		Usage()
+		return
+	case 1:
+		t.One(
+			flags.numbers[0],
+			flags.numbersAsWritten[0],
+		)
+	case 2:
+		t.Two(
+			flags.numbers[0],
+			flags.numbers[1],
+			flags.numbersAsWritten[0],
+			flags.numbersAsWritten[1],
+		)
+	default:
+	}
+	t.Render()
 }
 
 func Fatal(message string) {

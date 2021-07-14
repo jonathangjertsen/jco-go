@@ -21,4 +21,6 @@ if __name__ == "__main__":
         )
         dest = RELEASE_DIR / Path(archive_name).name
         shutil.move(archive_name, dest)
-        print(f"Path: {dest}, size: {dest.stat().st_size/(1000000):.1f}MB")
+        original_size = path.stat().st_size/1000
+        compressed_size = dest.stat().st_size/1000
+        print(f"Path: {dest}, size: {compressed_size:.0f} kB compressed, {original_size:.0f} kB uncompressed")
