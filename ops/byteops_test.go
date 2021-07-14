@@ -241,10 +241,10 @@ func TestBytesToHex(t *testing.T) {
 
 	// Property: BytesToHex does not truncate
 	check(t, func(a []byte, n uint) bool {
-		if uint(len(a)) >= n {
-			return reflect.DeepEqual(BytesToHex(a, n), BytesToHex(a, uint(len(a))))
+		if Ulen(a) >= n {
+			return reflect.DeepEqual(BytesToHex(a, n), BytesToHex(a, Ulen(a)))
 		} else {
-			return strings.HasSuffix(BytesToHex(a, n)[2:], BytesToHex(a, uint(len(a)))[2:])
+			return strings.HasSuffix(BytesToHex(a, n)[2:], BytesToHex(a, Ulen(a))[2:])
 		}
 	})
 }

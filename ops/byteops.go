@@ -23,13 +23,13 @@ func byteAdd(a, b byte) (byte, byte) {
 }
 
 // Returns the first index such that input[index] != 0, or len(input) if no such input is found
-func firstNonZeroIndex(input []byte) int {
-	for i := 0; i < len(input); i++ {
+func firstNonZeroIndex(input []byte) uint {
+	for i := uint(0); i < Ulen(input); i++ {
 		if input[i] != 0 {
 			return i
 		}
 	}
-	return len(input)
+	return Ulen(input)
 }
 
 // Returns whichever is greatest of a and b
@@ -91,10 +91,15 @@ func Add(a, b []byte) []byte {
 
 // Returns a AND b
 func And(a, b []byte) []byte {
+	return BinaryOp(a, b, func(ai, bi byte) byte { return ai & bi })
+}
+
+// Returns OP(a, b)
+func BinaryOp(a, b []byte, elemfunc func(ai, bi byte) byte) []byte {
 	a, b = PadToEqualSize(a, b)
 	c := make([]byte, len(a))
 	for i, ai := range a {
-		c[i] = ai & b[i]
+		c[i] = elemfunc(ai, b[i])
 	}
 	return c
 }
@@ -123,8 +128,8 @@ func BytesToDec(a []byte, nBytes uint) string {
 
 // Returns the hexadecimal string representation of the bytes
 func BytesToHex(a []byte, nBytes uint) string {
-	if nBytes > uint(len(a)) {
-		a = PrependZeros(a, nBytes-uint(len(a)))
+	if nBytes > Ulen(a) {
+		a = PrependZeros(a, nBytes-Ulen(a))
 	}
 	return "0x" + hex.EncodeToString(a)
 }
@@ -191,53 +196,34 @@ func LeftIsGreaterOrEqual(left, right []byte) bool {
 
 // Returns the number of bits needed to represent the input
 func Nbits(input []byte) []byte {
-	byteNbits := func(b byte) byte {
-		for i := 7; i >= 0; i-- {
-			mask := byte(1 << i)
-			masked := mask & b
-			if masked != 0 {
-				return byte(i + 1)
-			}
-		}
-		return 0
-	}
 	trimmed := trimLeadingZeros(input)
 	sumUint64 := uint64(0)
 	if len(trimmed) > 0 {
-		sumUint64 += uint64(byteNbits(trimmed[0])) + uint64((len(trimmed)-1)*8)
+		sumUint64 += uint64(NBitsByte(trimmed[0])) + uint64((len(trimmed)-1)*8)
 	}
 	return uint64ToBytes(sumUint64)
 }
 
 // Returns ~a
 func Not(input []byte) []byte {
-	result := make([]byte, len(input))
-	for i, b := range input {
-		result[i] = byte(0xff - int(b))
-	}
-	return result
+	return UnaryOp(input, func(ai byte) byte { return byte(0xff - int(ai)) })
 }
 
 // Returns a OR b
 func Or(a, b []byte) []byte {
-	a, b = PadToEqualSize(a, b)
-	c := make([]byte, len(a))
-	for i, ai := range a {
-		c[i] = ai | b[i]
-	}
-	return c
+	return BinaryOp(a, b, func(ai, bi byte) byte { return ai | bi })
 }
 
 // Returns slices of equal length representing the same big-endian numbers as a and b
 func PadToEqualSize(a, b []byte) ([]byte, []byte) {
-	aLen := len(a)
-	bLen := len(b)
+	aLen := Ulen(a)
+	bLen := Ulen(b)
 	if aLen == bLen {
 		return a, b
 	} else if aLen > bLen {
-		return a, PrependZeros(b, uint(aLen-bLen))
+		return a, PrependZeros(b, aLen-bLen)
 	} else {
-		return PrependZeros(a, uint(bLen-aLen)), b
+		return PrependZeros(a, bLen-aLen), b
 	}
 }
 
@@ -287,14 +273,15 @@ func StringToBytes(a string) ([]byte, bool) {
 func Subtract(a, b []byte) []byte {
 	a, b = PadToEqualSize(a, b)
 	subtracted := Add(a, TwosComplement(b))
-	return Truncate(subtracted, uint(len(a)))
+	return Truncate(subtracted, Ulen(a))
 }
 
+// Returns the last n bytes in a
 func Truncate(a []byte, n uint) []byte {
-	if n >= uint(len(a)) {
+	if n >= Ulen(a) {
 		return a
 	} else {
-		return a[uint(len(a))-n:]
+		return a[Ulen(a)-n:]
 	}
 }
 
@@ -303,15 +290,29 @@ func TwosComplement(input []byte) []byte {
 	if len(input) == 0 {
 		return input
 	}
-	return Truncate(Add(Not(input), []byte{1}), uint(len(input)))
+	return Truncate(Add(Not(input), []byte{1}), Ulen(input))
+}
+
+// Returns the unsigned length of the input
+func Ulen(a []byte) uint {
+	return uint(len(a))
+}
+
+// Returns OP(a)
+func UnaryOp(a []byte, elemfunc func(ai byte) byte) []byte {
+	c := make([]byte, len(a))
+	for i, ai := range a {
+		c[i] = elemfunc(ai)
+	}
+	return c
+}
+
+// Returns the uint64 length of the input
+func U64len(a []byte) uint64 {
+	return uint64(len(a))
 }
 
 // Returns a XOR b
 func Xor(a, b []byte) []byte {
-	a, b = PadToEqualSize(a, b)
-	c := make([]byte, len(a))
-	for i, ai := range a {
-		c[i] = ai ^ b[i]
-	}
-	return c
+	return BinaryOp(a, b, func(ai, bi byte) byte { return ai ^ bi })
 }
