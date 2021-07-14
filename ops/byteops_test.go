@@ -260,6 +260,64 @@ func TestBytesToHex(t *testing.T) {
 	})
 }
 
+func TestBytesToUint64(t *testing.T) {
+	var vector = []struct {
+		input []byte
+		want  uint64
+	}{
+		{
+			[]byte{},
+			0,
+		},
+		{
+			[]byte{0},
+			0,
+		},
+		{
+			[]byte{0, 0},
+			0,
+		},
+		{
+			[]byte{0xff},
+			0xff,
+		},
+		{
+			[]byte{0x02, 0x55},
+			0x0255,
+		},
+		{
+			[]byte{0x02, 0x22},
+			0x0222,
+		},
+		{
+			[]byte{0x7f, 0x00},
+			0x7f00,
+		},
+		{
+			[]byte{0xff, 0xaa},
+			0xffaa,
+		},
+	}
+	for _, tt := range vector {
+		testname := fmt.Sprintf("%v\n", tt.input)
+		t.Run(testname, func(t *testing.T) {
+			have, err := bytesToUint64(tt.input)
+			if have != tt.want || err != nil {
+				t.Errorf("Want %v, have %v\n", tt.want, have)
+			}
+		})
+	}
+
+	// Property: BytesToHex does not truncate
+	check(t, func(a []byte, n uint) bool {
+		if Ulen(a) >= n {
+			return reflect.DeepEqual(BytesToHex(a, n), BytesToHex(a, Ulen(a)))
+		} else {
+			return strings.HasSuffix(BytesToHex(a, n)[2:], BytesToHex(a, Ulen(a))[2:])
+		}
+	})
+}
+
 func TestByteAdd(t *testing.T) {
 	// Vector part
 	var vector = []struct {
@@ -587,6 +645,85 @@ func TestPopcount(t *testing.T) {
 		lpc := len(Popcount(a))
 		return lpc == 1 || lpc <= len(a)/32
 	})
+}
+
+func TestShiftLeft(t *testing.T) {
+	var vector = []struct {
+		a    []byte
+		b    []byte
+		want []byte
+	}{
+		{
+			[]byte{0, 0, 0, 0},
+			[]byte{0},
+			[]byte{0, 0, 0, 0},
+		},
+		{
+			[]byte{},
+			[]byte{0x4},
+			[]byte{},
+		},
+		{
+			[]byte{0x10, 0x10},
+			[]byte{0x4},
+			[]byte{0x01, 0x01},
+		},
+		{
+			[]byte{0x1f, 0x10},
+			[]byte{0x3},
+			[]byte{0x03, 0xe2},
+		},
+		{
+			[]byte{0x4a},
+			[]byte{0x5},
+			[]byte{0x02},
+		},
+		{
+			[]byte{0x4a, 0xef, 0xae},
+			[]byte{0x5},
+			[]byte{0x02, 0x57, 0x7d},
+		},
+		{
+			[]byte{0x4a, 0xef, 0xae},
+			[]byte{0x4},
+			[]byte{0x04, 0xae, 0xfa},
+		},
+		{
+			[]byte{0x4a, 0xef, 0xae},
+			[]byte{0x8},
+			[]byte{0x00, 0x4a, 0xef},
+		},
+		{
+			[]byte{0x00, 0x0f},
+			[]byte{0x12},
+			[]byte{0x00, 0x00},
+		},
+		{
+			[]byte{0xff, 0xff},
+			[]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+			[]byte{0x00, 0x00},
+		},
+	}
+	for _, tt := range vector {
+		testname := fmt.Sprintf("%v,%v\n", tt.a, tt.b)
+		t.Run(testname, func(t *testing.T) {
+			have := ShiftLeft(tt.a, tt.b)
+			if !bytes.Equal(have, tt.want) {
+				t.Errorf("Want %v, have %v\n", tt.want, have)
+			}
+		})
+	}
+
+	// Property: ShiftLeft has same length as input
+	check(t, func(a, b []byte) bool {
+		return len(ShiftLeft(a, b)) == len(a)
+	})
+
+	// Property: ShiftLeft is less or equal to input
+	check(t, func(a, b []byte) bool {
+		return LeftIsGreaterOrEqual(a, ShiftLeft(a, b))
+	})
+
 }
 
 func TestStringToBytes(t *testing.T) {

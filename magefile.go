@@ -209,7 +209,7 @@ func Run() error {
 	mg.Deps(Debug)
 	output, err := run(
 		executablePath(runtime.GOOS, runtime.GOARCH, fmt.Sprintf("%s.debug", EXE)),
-		[]string{"0x4a", "0x5e", "-b", "16"},
+		[]string{"0x4aefae", "0xc", "-b", "24"},
 		map[string]string{},
 	)
 	fmt.Print(output)

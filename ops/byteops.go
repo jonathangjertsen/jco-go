@@ -3,6 +3,7 @@ package ops
 import (
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"math/big"
 	"math/bits"
 	"reflect"
@@ -11,6 +12,19 @@ import (
 const (
 	MAX_SLICE_SIZE = 1000
 )
+
+// Converts a big-endian byte array to uint64
+func bytesToUint64(input []byte) (uint64, error) {
+	input = trimLeadingZeros(input)
+	if !fitsInUint64(input) {
+		return 0, fmt.Errorf("%v is not representable as uint64", input)
+	}
+	num := uint64(0)
+	for i, b := range ByteReverse(input) {
+		num += uint64(b) << (8 * i)
+	}
+	return num, nil
+}
 
 // Adds two bytes, returning the sum (i.e.: (a+b)%256) and carry (i.e.: (a+b)/256)
 func byteAdd(a, b byte) (byte, byte) {
@@ -35,6 +49,22 @@ func firstNonZeroIndex(input []byte) uint {
 		}
 	}
 	return Ulen(input)
+}
+
+// Returns whether the result can be represented as a uint64
+func fitsInUint64(a []byte) bool {
+	return nbitsAsUint64(a) <= 64
+}
+
+func nbitsAsUint64(input []byte) uint64 {
+	trimmed := trimLeadingZeros(input)
+	sumUint64 := uint64(0)
+	if len(trimmed) > 0 {
+		// Since the input has been trimmed, the result must be the number of bits
+		// to represent the first byte plus the bit length of everything else
+		sumUint64 += uint64(NBitsByte(trimmed[0])) + uint64((len(trimmed)-1)*8)
+	}
+	return sumUint64
 }
 
 // Adds value to the front of the slice
@@ -230,14 +260,7 @@ func LeftIsGreaterOrEqual(left, right []byte) bool {
 
 // Returns the number of bits needed to represent the input
 func Nbits(input []byte) []byte {
-	trimmed := trimLeadingZeros(input)
-	sumUint64 := uint64(0)
-	if len(trimmed) > 0 {
-		// Since the input has been trimmed, the result must be the number of bits
-		// to represent the first byte plus the bit length of everything else
-		sumUint64 += uint64(NBitsByte(trimmed[0])) + uint64((len(trimmed)-1)*8)
-	}
-	return uint64ToBytes(sumUint64)
+	return uint64ToBytes(nbitsAsUint64(input))
 }
 
 // Returns ~a
@@ -295,6 +318,48 @@ func RightIsSuffixOfLeft(left, right []byte) bool {
 
 	// No differences found
 	return true
+}
+
+// Returns a >> b
+func ShiftLeft(a, b []byte) []byte {
+	if len(a) == 0 {
+		return a
+	}
+	b = trimLeadingZeros(b)
+	nBits, err := bytesToUint64(b)
+	if err != nil || nBits >= nbitsAsUint64(a) {
+		return Zeros(Ulen(a))
+	}
+
+	// First do the part of the shift that is divisible by 8
+	nBytes := nBits / 8
+
+	// Copy over starting from the end of the slice
+	for i := uint64(0); i < U64len(a)-nBytes; i++ {
+		dest := U64len(a) - 1 - i
+		src := dest - nBytes
+		a[dest] = a[src]
+	}
+
+	// Fill the front with zeros
+	for i := uint64(0); i < nBytes; i++ {
+		a[i] = 0
+	}
+
+	// Then do the remainder
+	nBits = nBits % 8
+	for i := uint64(0); i < nBits; i++ {
+		carry := false
+		for j, ai := range a {
+			a[j] >>= 1
+			if carry {
+				a[j] += 1 << 7
+			}
+			carry = ai&1 == 1
+		}
+	}
+
+	return a
 }
 
 // Parses the input string to a byte array
@@ -356,4 +421,9 @@ func U64len(a []byte) uint64 {
 // Returns a XOR b
 func Xor(a, b []byte) []byte {
 	return BinaryOp(a, b, func(ai, bi byte) byte { return ai ^ bi })
+}
+
+// Returns zero-initialized byte slice of length n
+func Zeros(n uint) []byte {
+	return make([]byte, n)
 }
