@@ -3,9 +3,12 @@
 Command line utility to quickly get info about the hex, binary and decimal representations of numbers, and the most common operations on the bits. This is particularly helpful when looking
 at hex dumps from some source when you're not sure which bits go where.
 
-## Installation and usage
+## Installation
 
-Installation: TODO
+* Download the latest release for your OS/arch from https://github.com/jonathangjertsen/jco-go/releases/latest
+* Unpack the tar.gz to get the `jco` executable
+* Move it to some directory that is on the PATH
+* Test it by running `jco -v`, it should print the version of the latest release.
 
 ### Usage
 
