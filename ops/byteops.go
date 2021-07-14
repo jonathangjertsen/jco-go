@@ -99,25 +99,6 @@ func And(a, b []byte) []byte {
 	return c
 }
 
-// Returns the input with the byte order reversed
-// Leading zeros in the output (due to trailing zeros in the input) are NOT removed
-func ByteReverse(input []byte) []byte {
-	reversed := make([]byte, len(input))
-	copy(reversed, input)
-	for i, j := 0, len(reversed)-1; i < j; i, j = i+1, j-1 {
-		reversed[i], reversed[j] = reversed[j], reversed[i]
-	}
-	return reversed
-}
-
-// Returns the hexadecimal string representation of the bytes
-func BytesToHex(a []byte, nBytes uint) string {
-	if nBytes > uint(len(a)) {
-		a = PrependZeros(a, nBytes-uint(len(a)))
-	}
-	return "0x" + hex.EncodeToString(a)
-}
-
 // Returns the binary string representation of the bytes
 func BytesToBin(a []byte, nBytes uint) string {
 	parts := []byte("0b")
@@ -138,6 +119,25 @@ func BytesToBin(a []byte, nBytes uint) string {
 // Returns the decimal string representation of the bytes
 func BytesToDec(a []byte, nBytes uint) string {
 	return big.NewInt(0).SetBytes(a).String()
+}
+
+// Returns the hexadecimal string representation of the bytes
+func BytesToHex(a []byte, nBytes uint) string {
+	if nBytes > uint(len(a)) {
+		a = PrependZeros(a, nBytes-uint(len(a)))
+	}
+	return "0x" + hex.EncodeToString(a)
+}
+
+// Returns the input with the byte order reversed
+// Leading zeros in the output (due to trailing zeros in the input) are NOT removed
+func ByteReverse(input []byte) []byte {
+	reversed := make([]byte, len(input))
+	copy(reversed, input)
+	for i, j := 0, len(reversed)-1; i < j; i, j = i+1, j-1 {
+		reversed[i], reversed[j] = reversed[j], reversed[i]
+	}
+	return reversed
 }
 
 // Returns the number of leading zeros in the input
@@ -228,16 +228,6 @@ func Or(a, b []byte) []byte {
 	return c
 }
 
-// Prepends n zeros to the slice
-func PrependZeros(slice []byte, n uint) []byte {
-	if n > MAX_SLICE_SIZE {
-		n = MAX_SLICE_SIZE
-	}
-
-	zeros := make([]byte, n)
-	return append(zeros, slice...)
-}
-
 // Returns slices of equal length representing the same big-endian numbers as a and b
 func PadToEqualSize(a, b []byte) ([]byte, []byte) {
 	aLen := len(a)
@@ -260,6 +250,16 @@ func Popcount(input []byte) []byte {
 	return uint64ToBytes(answerInt)
 }
 
+// Prepends n zeros to the slice
+func PrependZeros(slice []byte, n uint) []byte {
+	if n > MAX_SLICE_SIZE {
+		n = MAX_SLICE_SIZE
+	}
+
+	zeros := make([]byte, n)
+	return append(zeros, slice...)
+}
+
 func RightIsSuffixOfLeft(left, right []byte) bool {
 	if len(left) < len(right) {
 		return false
@@ -273,13 +273,6 @@ func RightIsSuffixOfLeft(left, right []byte) bool {
 	return true
 }
 
-// Subtracts b from a, both representing big-endian numbers
-func Subtract(a, b []byte) []byte {
-	a, b = PadToEqualSize(a, b)
-	subtracted := Add(a, TwosComplement(b))
-	return Truncate(subtracted, uint(len(a)))
-}
-
 // Parses the input string to a byte array
 func StringToBytes(a string) ([]byte, bool) {
 	resultInt, ok := big.NewInt(0).SetString(a, 0)
@@ -288,6 +281,13 @@ func StringToBytes(a string) ([]byte, bool) {
 		result = resultInt.Bytes()
 	}
 	return result, ok
+}
+
+// Subtracts b from a, both representing big-endian numbers
+func Subtract(a, b []byte) []byte {
+	a, b = PadToEqualSize(a, b)
+	subtracted := Add(a, TwosComplement(b))
+	return Truncate(subtracted, uint(len(a)))
 }
 
 func Truncate(a []byte, n uint) []byte {

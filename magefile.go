@@ -33,14 +33,6 @@ func build(os, arch, executable string, args []string) error {
 	return err
 }
 
-func executablePath(os, arch, executable string) string {
-	extension := ""
-	if os == "windows" {
-		extension = ".exe"
-	}
-	return fmt.Sprintf("bin/%s-%s/%s%s", os, arch, executable, extension)
-}
-
 func emitFixedTestOutput(output string) {
 	for _, line := range strings.Split(output, "\n") {
 		if strings.Contains(line, "[no test files]") {
@@ -54,6 +46,14 @@ func emitFixedTestOutput(output string) {
 			color.New().Println(line)
 		}
 	}
+}
+
+func executablePath(os, arch, executable string) string {
+	extension := ""
+	if os == "windows" {
+		extension = ".exe"
+	}
+	return fmt.Sprintf("bin/%s-%s/%s%s", os, arch, executable, extension)
 }
 
 func parallelBuild(builders [](func() error)) {
@@ -88,31 +88,6 @@ func run(program string, args []string, env map[string]string) (string, error) {
 	return sh.OutputWith(env, program, args...)
 }
 
-// Builds an executable for Windows AMD64
-func BuildWindowsAmd64() error {
-	return build("windows", "amd64", EXE, []string{"-tags", "release"})
-}
-
-// Builds an executable for Mac AMD64
-func BuildMacAmd64() error {
-	return build("darwin", "amd64", EXE, []string{"-tags", "release"})
-}
-
-// Builds an executable for Mac ARM64
-func BuildMacArm64() error {
-	return build("darwin", "arm64", EXE, []string{"-tags", "release"})
-}
-
-// Builds an executable for Linux AMD64
-func BuildLinuxAmd64() error {
-	return build("linux", "amd64", EXE, []string{"-tags", "release"})
-}
-
-// Builds an executable for Linux ARM64
-func BuildLinuxArm64() error {
-	return build("linux", "arm64", EXE, []string{"-tags", "release"})
-}
-
 // Builds an executable for this computer
 func Build() error {
 	return build(runtime.GOOS, runtime.GOARCH, EXE, []string{"-tags", "release"})
@@ -130,16 +105,29 @@ func BuildAll() {
 	})
 }
 
-// Runs everything that a CI system might want to do
-func Ci() {
-	mg.Deps(CheckRepoClean)
-	mg.Deps(Check)
-	mg.Deps(Test)
-	mg.Deps(TestExtensively)
-	mg.Deps(BuildAll)
-	mg.Deps(Run)
-	mg.Deps(RunRelease)
-	color.HiGreen("All CI steps passed")
+// Builds an executable for Linux AMD64
+func BuildLinuxAmd64() error {
+	return build("linux", "amd64", EXE, []string{"-tags", "release"})
+}
+
+// Builds an executable for Linux ARM64
+func BuildLinuxArm64() error {
+	return build("linux", "arm64", EXE, []string{"-tags", "release"})
+}
+
+// Builds an executable for Mac AMD64
+func BuildMacAmd64() error {
+	return build("darwin", "amd64", EXE, []string{"-tags", "release"})
+}
+
+// Builds an executable for Mac ARM64
+func BuildMacArm64() error {
+	return build("darwin", "arm64", EXE, []string{"-tags", "release"})
+}
+
+// Builds an executable for Windows AMD64
+func BuildWindowsAmd64() error {
+	return build("windows", "amd64", EXE, []string{"-tags", "release"})
 }
 
 // Runs go vet and go fmt, and checks that they don't say anything
@@ -191,6 +179,18 @@ func CheckRepoClean() error {
 		return fmt.Errorf("git status --porcelain says something:\n%s", output)
 	}
 	return nil
+}
+
+// Runs everything that a CI system might want to do
+func Ci() {
+	mg.Deps(CheckRepoClean)
+	mg.Deps(Check)
+	mg.Deps(Test)
+	mg.Deps(TestExtensively)
+	mg.Deps(BuildAll)
+	mg.Deps(Run)
+	mg.Deps(RunRelease)
+	color.HiGreen("All CI steps passed")
 }
 
 // Cleans the bin directory

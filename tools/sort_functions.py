@@ -140,24 +140,25 @@ def function_name_and_receiver_type(function: str) -> str:
             return name, receiver_type
     return ""
 
-def name_key(name: str) -> int:
+def name_key(name: str) -> tuple[int]:
     if not name:
-        return 0
+        return (0,)
     offset = 0
     first_letter = name[offset]
     while first_letter == "*":
         offset += 1
         first_letter = name[offset]
     if first_letter == '_':
-        return 1
+        key = 1
     elif 'a' <= first_letter <= 'z':
-        return ord(first_letter) - ord('a') + 1
+        key = ord(first_letter) - ord('a') + 10
     elif 'A' <= first_letter <= 'Z':
-        return ord(first_letter) - ord('A') + 1000
+        key = ord(first_letter) - ord('A') + 1000
     else:
-        raise ValueError(name)
+        key = 1000000
+    return (key, *name_key(name[1:]))
 
-def function_key(function: str) -> int:
+def function_key(function: str) -> tuple[int]:
     """
     Returns a key to ensure the following sort order:
 
@@ -168,7 +169,7 @@ def function_key(function: str) -> int:
     """
     name, receiver_type = function_name_and_receiver_type(function)
     assert name, f"No name for function:\n\n{function}\n\n"
-    return name_key(name) + name_key(receiver_type)*1000
+    return name_key(receiver_type) + name_key(name)
 
 
 def recombine_functions(preamble: str, functions: list[str]) -> str:

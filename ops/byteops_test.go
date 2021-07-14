@@ -16,6 +16,239 @@ func check(t *testing.T, f interface{}) {
 	}
 }
 
+func TestAdd(t *testing.T) {
+	var vector = []struct {
+		a    []byte
+		b    []byte
+		want []byte
+	}{
+		{
+			[]byte{0, 0, 0, 0},
+			[]byte{0, 0, 0, 0},
+			[]byte{0, 0, 0, 0},
+		},
+		{
+			[]byte{0x10, 0x10},
+			[]byte{0x20, 0x20},
+			[]byte{0x30, 0x30},
+		},
+		{
+			[]byte{0xff, 0xff},
+			[]byte{0xff, 0xff},
+			[]byte{0x01, 0xff, 0xfe},
+		},
+		{
+			[]byte{0xff, 0xff},
+			[]byte{0, 0, 0, 0, 0, 0, 0xff, 0xff},
+			[]byte{0, 0, 0, 0, 0, 0x01, 0xff, 0xfe},
+		},
+		{
+			[]byte{20, 110, 177, 39, 171, 32, 91, 192, 152},
+			[]byte{235, 201, 191, 208, 116, 20, 104, 155, 109},
+			[]byte{1, 0, 56, 112, 248, 31, 52, 196, 92, 5},
+		},
+	}
+	for _, tt := range vector {
+		testname := fmt.Sprintf("%v,%v\n", tt.a, tt.b)
+		t.Run(testname, func(t *testing.T) {
+			have := Add(tt.a, tt.b)
+			if !bytes.Equal(have, tt.want) {
+				t.Errorf("Want %v, have %v\n", tt.want, have)
+			}
+		})
+	}
+
+	// Property: len(a+b) >= len(a)
+	check(t, func(a, b []byte) bool {
+		added := Add(a, b)
+		ok := len(added) >= len(a) && len(added) >= len(b)
+		if !ok {
+			fmt.Printf("Failing added: %v\n", added)
+		}
+		return ok
+	})
+
+	// Property: a+b >= a and a+b >= b
+	check(t, func(a, b []byte) bool {
+		added := Add(a, b)
+		ok := LeftIsGreaterOrEqual(added, a) && LeftIsGreaterOrEqual(added, b)
+		if !ok {
+			fmt.Printf("Failing added: %v\n", added)
+		}
+		return ok
+	})
+
+	// Property: a + b == b + a
+	check(t, func(a, b []byte) bool {
+		apb := Add(a, b)
+		bpa := Add(b, a)
+		ok := reflect.DeepEqual(apb, bpa)
+		if !ok {
+			fmt.Printf("Failing a+b: %v, b+a: %v\n", apb, bpa)
+		}
+		return ok
+	})
+
+	// Property: a + 0 == a
+	check(t, func(a []byte) bool {
+		ok := reflect.DeepEqual(a, Add(a, []byte{})) && reflect.DeepEqual(a, Add([]byte{}, a)) && Equivalent(a, Add([]byte{0, 0, 0}, a))
+		if !ok {
+			fmt.Printf("Failing value: %v\n", a)
+		}
+		return ok
+	})
+}
+
+func TestAnd(t *testing.T) {
+	var vector = []struct {
+		a    []byte
+		b    []byte
+		want []byte
+	}{
+		{
+			[]byte{0, 0, 0, 0},
+			[]byte{0, 0, 0, 0},
+			[]byte{0, 0, 0, 0},
+		},
+		{
+			[]byte{0x10, 0x10},
+			[]byte{0x20, 0x20},
+			[]byte{0x00, 0x00},
+		},
+		{
+			[]byte{0xff, 0xff},
+			[]byte{0xff, 0xff},
+			[]byte{0xff, 0xff},
+		},
+		{
+			[]byte{0xff, 0xff},
+			[]byte{0, 0, 0, 0, 0, 0, 0xff, 0xff},
+			[]byte{0, 0, 0, 0, 0, 0, 0xff, 0xff},
+		},
+	}
+	for _, tt := range vector {
+		testname := fmt.Sprintf("%v,%v\n", tt.a, tt.b)
+		t.Run(testname, func(t *testing.T) {
+			have := And(tt.a, tt.b)
+			if !bytes.Equal(have, tt.want) {
+				t.Errorf("Want %v, have %v\n", tt.want, have)
+			}
+		})
+	}
+
+	// Property: len(a&b) == len(a)
+	check(t, func(a, b []byte) bool {
+		ored := And(a, b)
+		a, b = PadToEqualSize(a, b)
+		return len(ored) == len(a) && len(ored) == len(b)
+	})
+
+	// Property: a & 0 == 0
+	check(t, func(a []byte) bool {
+		zero := make([]byte, len(a))
+		for i, _ := range zero {
+			zero[i] = 0
+		}
+		return Equivalent(zero, And(a, zero))
+	})
+
+	// Property: a & -1 == a
+	check(t, func(a []byte) bool {
+		minus1 := make([]byte, len(a))
+		for i, _ := range minus1 {
+			minus1[i] = 0xff
+		}
+		return Equivalent(a, And(a, minus1))
+	})
+}
+
+func TestBytesToHex(t *testing.T) {
+	var vector = []struct {
+		input  []byte
+		nBytes uint
+		want   string
+	}{
+		{
+			[]byte{},
+			1,
+			"0x00",
+		},
+		{
+			[]byte{0},
+			1,
+			"0x00",
+		},
+		{
+			[]byte{0, 0},
+			1,
+			"0x0000",
+		},
+		{
+			[]byte{0, 0},
+			2,
+			"0x0000",
+		},
+		{
+			[]byte{0, 0},
+			3,
+			"0x000000",
+		},
+		{
+			[]byte{0xff},
+			1,
+			"0xff",
+		},
+		{
+			[]byte{0x02, 0x55},
+			2,
+			"0x0255",
+		},
+		{
+			[]byte{0x02, 0x22},
+			2,
+			"0x0222",
+		},
+		{
+			[]byte{0x7f, 0x00},
+			2,
+			"0x7f00",
+		},
+		{
+			[]byte{0x7f, 0x00},
+			1,
+			"0x7f00",
+		},
+		{
+			[]byte{0x7f, 0x00},
+			6,
+			"0x000000007f00",
+		},
+		{
+			[]byte{0xff, 0xaa},
+			2,
+			"0xffaa",
+		},
+	}
+	for _, tt := range vector {
+		testname := fmt.Sprintf("%v\n", tt.input)
+		t.Run(testname, func(t *testing.T) {
+			have := BytesToHex(tt.input, tt.nBytes)
+			if have != tt.want {
+				t.Errorf("Want %v, have %v\n", tt.want, have)
+			}
+		})
+	}
+
+	// Property: BytesToHex does not truncate
+	check(t, func(a []byte, n uint) bool {
+		if uint(len(a)) >= n {
+			return reflect.DeepEqual(BytesToHex(a, n), BytesToHex(a, uint(len(a))))
+		} else {
+			return strings.HasSuffix(BytesToHex(a, n)[2:], BytesToHex(a, uint(len(a)))[2:])
+		}
+	})
+}
+
 func TestByteAdd(t *testing.T) {
 	// Vector part
 	var vector = []struct {
@@ -134,451 +367,6 @@ func TestByteReverse(t *testing.T) {
 	})
 }
 
-func TestTrimLeadingZeros(t *testing.T) {
-	var vector = []struct {
-		input []byte
-		want  []byte
-	}{
-		{
-			[]byte{0, 0, 0, 0},
-			[]byte{},
-		},
-		{
-			[]byte{0xff, 0},
-			[]byte{0xff, 0},
-		},
-		{
-			[]byte{0, 0xff},
-			[]byte{0xff},
-		},
-		{
-			[]byte{0xff, 0xff},
-			[]byte{0xff, 0xff},
-		},
-	}
-	for _, tt := range vector {
-		testname := fmt.Sprintf("%v\n", tt.input)
-		t.Run(testname, func(t *testing.T) {
-			have := trimLeadingZeros(tt.input)
-			if !bytes.Equal(have, tt.want) {
-				t.Errorf("Want %v, have %v\n", tt.want, have)
-			}
-		})
-	}
-
-	// Property: trimmed will be a smaller slice or exactly equal to input
-	check(t, func(a []byte) bool {
-		trimmed := trimLeadingZeros(a)
-		ok := len(trimmed) < len(a) || reflect.DeepEqual(trimmed, a)
-		if !ok {
-			fmt.Printf("Failing trimmed: %v\n", trimmed)
-		}
-		return ok
-	})
-
-	// Property: trimmed is a suffix of the original
-	check(t, func(a []byte) bool {
-		trimmed := trimLeadingZeros(a)
-		ok := RightIsSuffixOfLeft(a, trimmed)
-		if !ok {
-			fmt.Printf("Failing trimmed: %v\n", trimmed)
-		}
-		return ok
-	})
-
-	// Property: trimmed is equivalent to input
-	check(t, func(a []byte) bool {
-		trimmed := trimLeadingZeros(a)
-		ok := Equivalent(a, trimmed)
-		if !ok {
-			fmt.Printf("Failing trimmed: %v\n", trimmed)
-		}
-		return ok
-	})
-}
-
-func TestAdd(t *testing.T) {
-	var vector = []struct {
-		a    []byte
-		b    []byte
-		want []byte
-	}{
-		{
-			[]byte{0, 0, 0, 0},
-			[]byte{0, 0, 0, 0},
-			[]byte{0, 0, 0, 0},
-		},
-		{
-			[]byte{0x10, 0x10},
-			[]byte{0x20, 0x20},
-			[]byte{0x30, 0x30},
-		},
-		{
-			[]byte{0xff, 0xff},
-			[]byte{0xff, 0xff},
-			[]byte{0x01, 0xff, 0xfe},
-		},
-		{
-			[]byte{0xff, 0xff},
-			[]byte{0, 0, 0, 0, 0, 0, 0xff, 0xff},
-			[]byte{0, 0, 0, 0, 0, 0x01, 0xff, 0xfe},
-		},
-		{
-			[]byte{20, 110, 177, 39, 171, 32, 91, 192, 152},
-			[]byte{235, 201, 191, 208, 116, 20, 104, 155, 109},
-			[]byte{1, 0, 56, 112, 248, 31, 52, 196, 92, 5},
-		},
-	}
-	for _, tt := range vector {
-		testname := fmt.Sprintf("%v,%v\n", tt.a, tt.b)
-		t.Run(testname, func(t *testing.T) {
-			have := Add(tt.a, tt.b)
-			if !bytes.Equal(have, tt.want) {
-				t.Errorf("Want %v, have %v\n", tt.want, have)
-			}
-		})
-	}
-
-	// Property: len(a+b) >= len(a)
-	check(t, func(a, b []byte) bool {
-		added := Add(a, b)
-		ok := len(added) >= len(a) && len(added) >= len(b)
-		if !ok {
-			fmt.Printf("Failing added: %v\n", added)
-		}
-		return ok
-	})
-
-	// Property: a+b >= a and a+b >= b
-	check(t, func(a, b []byte) bool {
-		added := Add(a, b)
-		ok := LeftIsGreaterOrEqual(added, a) && LeftIsGreaterOrEqual(added, b)
-		if !ok {
-			fmt.Printf("Failing added: %v\n", added)
-		}
-		return ok
-	})
-
-	// Property: a + b == b + a
-	check(t, func(a, b []byte) bool {
-		apb := Add(a, b)
-		bpa := Add(b, a)
-		ok := reflect.DeepEqual(apb, bpa)
-		if !ok {
-			fmt.Printf("Failing a+b: %v, b+a: %v\n", apb, bpa)
-		}
-		return ok
-	})
-
-	// Property: a + 0 == a
-	check(t, func(a []byte) bool {
-		ok := reflect.DeepEqual(a, Add(a, []byte{})) && reflect.DeepEqual(a, Add([]byte{}, a)) && Equivalent(a, Add([]byte{0, 0, 0}, a))
-		if !ok {
-			fmt.Printf("Failing value: %v\n", a)
-		}
-		return ok
-	})
-}
-
-func TestSubtract(t *testing.T) {
-	var vector = []struct {
-		a    []byte
-		b    []byte
-		want []byte
-	}{
-		{
-			[]byte{},
-			[]byte{},
-			[]byte{},
-		},
-		{
-			[]byte{0},
-			[]byte{0},
-			[]byte{0},
-		},
-		{
-			[]byte{0x20, 0x20},
-			[]byte{0x10, 0x10},
-			[]byte{0x10, 0x10},
-		},
-		{
-			[]byte{0xff, 0xff},
-			[]byte{0xff, 0xff},
-			[]byte{0x00, 0x00},
-		},
-	}
-	for _, tt := range vector {
-		testname := fmt.Sprintf("%v,%v\n", tt.a, tt.b)
-		t.Run(testname, func(t *testing.T) {
-			have := Subtract(tt.a, tt.b)
-			if !bytes.Equal(have, tt.want) {
-				t.Errorf("Want %v, have %v\n", tt.want, have)
-			}
-		})
-	}
-
-	// Property: a - b == -(b - a)
-	check(t, func(a, b []byte) bool {
-		amb := Subtract(a, b)
-		bma := Subtract(b, a)
-		bmaTwosComplement := TwosComplement(bma)
-		ok := reflect.DeepEqual(amb, bmaTwosComplement)
-		if !ok {
-			fmt.Printf("Failing a-b: %v, -(b-a): %v\n", amb, bmaTwosComplement)
-		}
-		return ok
-	})
-
-	// Property: a - 0 == a
-	check(t, func(a []byte) bool {
-		subtractingEmptyZero := Subtract(a, []byte{})
-		subtractingNonEmptyZero := Subtract(a, []byte{0, 0, 0})
-		ok := reflect.DeepEqual(a, subtractingEmptyZero) && Equivalent(a, subtractingNonEmptyZero)
-		if !ok {
-			fmt.Printf("Failing subtractingEmptyZero: %v, subtractingNonEmptyZero: %v\n", subtractingEmptyZero, subtractingNonEmptyZero)
-		}
-		return ok
-	})
-
-	// Property: 0 - a == -a
-	check(t, func(a []byte) bool {
-		subtractingFromEmptyZero := Subtract([]byte{}, a)
-		ok := reflect.DeepEqual(TwosComplement(a), subtractingFromEmptyZero)
-		if !ok {
-			fmt.Printf("Failing subtractingFromEmptyZero: %v\n", subtractingFromEmptyZero)
-		}
-		return ok
-	})
-}
-
-func TestOr(t *testing.T) {
-	var vector = []struct {
-		a    []byte
-		b    []byte
-		want []byte
-	}{
-		{
-			[]byte{0, 0, 0, 0},
-			[]byte{0, 0, 0, 0},
-			[]byte{0, 0, 0, 0},
-		},
-		{
-			[]byte{0x10, 0x10},
-			[]byte{0x20, 0x20},
-			[]byte{0x30, 0x30},
-		},
-		{
-			[]byte{0xff, 0xff},
-			[]byte{0xff, 0xff},
-			[]byte{0xff, 0xff},
-		},
-		{
-			[]byte{0xff, 0xff},
-			[]byte{0, 0, 0, 0, 0, 0, 0xff, 0xff},
-			[]byte{0, 0, 0, 0, 0, 0, 0xff, 0xff},
-		},
-	}
-	for _, tt := range vector {
-		testname := fmt.Sprintf("%v,%v\n", tt.a, tt.b)
-		t.Run(testname, func(t *testing.T) {
-			have := Or(tt.a, tt.b)
-			if !bytes.Equal(have, tt.want) {
-				t.Errorf("Want %v, have %v\n", tt.want, have)
-			}
-		})
-	}
-
-	// Property: len(a|b) == len(a)
-	check(t, func(a, b []byte) bool {
-		ored := Or(a, b)
-		a, b = PadToEqualSize(a, b)
-		return len(ored) == len(a) && len(ored) == len(b)
-	})
-
-	// Property: a | 0 == a
-	check(t, func(a []byte) bool {
-		zero := make([]byte, len(a))
-		for i, _ := range zero {
-			zero[i] = 0
-		}
-		return Equivalent(a, Or(a, zero))
-	})
-
-	// Property: a | -1 == -1
-	check(t, func(a []byte) bool {
-		minus1 := make([]byte, len(a))
-		for i, _ := range minus1 {
-			minus1[i] = 0xff
-		}
-		return Equivalent(minus1, Or(a, minus1))
-	})
-}
-
-func TestAnd(t *testing.T) {
-	var vector = []struct {
-		a    []byte
-		b    []byte
-		want []byte
-	}{
-		{
-			[]byte{0, 0, 0, 0},
-			[]byte{0, 0, 0, 0},
-			[]byte{0, 0, 0, 0},
-		},
-		{
-			[]byte{0x10, 0x10},
-			[]byte{0x20, 0x20},
-			[]byte{0x00, 0x00},
-		},
-		{
-			[]byte{0xff, 0xff},
-			[]byte{0xff, 0xff},
-			[]byte{0xff, 0xff},
-		},
-		{
-			[]byte{0xff, 0xff},
-			[]byte{0, 0, 0, 0, 0, 0, 0xff, 0xff},
-			[]byte{0, 0, 0, 0, 0, 0, 0xff, 0xff},
-		},
-	}
-	for _, tt := range vector {
-		testname := fmt.Sprintf("%v,%v\n", tt.a, tt.b)
-		t.Run(testname, func(t *testing.T) {
-			have := And(tt.a, tt.b)
-			if !bytes.Equal(have, tt.want) {
-				t.Errorf("Want %v, have %v\n", tt.want, have)
-			}
-		})
-	}
-
-	// Property: len(a&b) == len(a)
-	check(t, func(a, b []byte) bool {
-		ored := And(a, b)
-		a, b = PadToEqualSize(a, b)
-		return len(ored) == len(a) && len(ored) == len(b)
-	})
-
-	// Property: a & 0 == 0
-	check(t, func(a []byte) bool {
-		zero := make([]byte, len(a))
-		for i, _ := range zero {
-			zero[i] = 0
-		}
-		return Equivalent(zero, And(a, zero))
-	})
-
-	// Property: a & -1 == a
-	check(t, func(a []byte) bool {
-		minus1 := make([]byte, len(a))
-		for i, _ := range minus1 {
-			minus1[i] = 0xff
-		}
-		return Equivalent(a, And(a, minus1))
-	})
-}
-
-func TestXor(t *testing.T) {
-	var vector = []struct {
-		a    []byte
-		b    []byte
-		want []byte
-	}{
-		{
-			[]byte{0, 0, 0, 0},
-			[]byte{0, 0, 0, 0},
-			[]byte{0, 0, 0, 0},
-		},
-		{
-			[]byte{0x10, 0x10},
-			[]byte{0x20, 0x20},
-			[]byte{0x30, 0x30},
-		},
-		{
-			[]byte{0xff, 0xff},
-			[]byte{0xff, 0xff},
-			[]byte{0x00, 0x00},
-		},
-		{
-			[]byte{0xff, 0xff},
-			[]byte{0, 0, 0, 0, 0, 0, 0xff, 0xff},
-			[]byte{0, 0, 0, 0, 0, 0, 0x00, 0x00},
-		},
-	}
-	for _, tt := range vector {
-		testname := fmt.Sprintf("%v,%v\n", tt.a, tt.b)
-		t.Run(testname, func(t *testing.T) {
-			have := Xor(tt.a, tt.b)
-			if !bytes.Equal(have, tt.want) {
-				t.Errorf("Want %v, have %v\n", tt.want, have)
-			}
-		})
-	}
-
-	// Property: len(a^b) == len(a)
-	check(t, func(a, b []byte) bool {
-		xored := Xor(a, b)
-		a, b = PadToEqualSize(a, b)
-		return len(xored) == len(a) && len(xored) == len(b)
-	})
-
-	// Property: a ^ 0 == a
-	check(t, func(a []byte) bool {
-		zero := make([]byte, len(a))
-		for i, _ := range zero {
-			zero[i] = 0
-		}
-		return Equivalent(a, Xor(a, zero))
-	})
-
-	// Property: a ^ -1 == ~a
-	check(t, func(a []byte) bool {
-		minus1 := make([]byte, len(a))
-		for i, _ := range minus1 {
-			minus1[i] = 0xff
-		}
-		return Equivalent(Not(a), Xor(a, minus1))
-	})
-}
-
-func TestPopcount(t *testing.T) {
-	var vector = []struct {
-		input []byte
-		want  []byte
-	}{
-		{
-			[]byte{0, 0, 0, 0},
-			[]byte{},
-		},
-		{
-			[]byte{0xff, 0},
-			[]byte{8},
-		},
-		{
-			[]byte{0xff, 0xaa},
-			[]byte{12},
-		},
-		{
-			[]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
-			[]byte{1, 0},
-		},
-	}
-	for _, tt := range vector {
-		testname := fmt.Sprintf("%v\n", tt.input)
-		t.Run(testname, func(t *testing.T) {
-			have := Popcount(tt.input)
-			if !bytes.Equal(have, tt.want) {
-				t.Errorf("Want %v, have %v\n", tt.want, have)
-			}
-		})
-	}
-
-	// Property: len(popcount(a)) <= max(1, len(a)/32)
-	check(t, func(a []byte) bool {
-		lpc := len(Popcount(a))
-		return lpc == 1 || lpc <= len(a)/32
-	})
-}
-
 func TestClz(t *testing.T) {
 	var vector = []struct {
 		input []byte
@@ -688,46 +476,105 @@ func TestNot(t *testing.T) {
 	})
 }
 
-func TestTwosComplement(t *testing.T) {
+func TestOr(t *testing.T) {
 	var vector = []struct {
-		input []byte
-		want  []byte
+		a    []byte
+		b    []byte
+		want []byte
 	}{
 		{
-			[]byte{},
-			[]byte{},
+			[]byte{0, 0, 0, 0},
+			[]byte{0, 0, 0, 0},
+			[]byte{0, 0, 0, 0},
 		},
 		{
-			[]byte{0xff},
-			[]byte{0x01},
+			[]byte{0x10, 0x10},
+			[]byte{0x20, 0x20},
+			[]byte{0x30, 0x30},
 		},
 		{
-			[]byte{0x7f, 0},
-			[]byte{0x81, 0x00},
+			[]byte{0xff, 0xff},
+			[]byte{0xff, 0xff},
+			[]byte{0xff, 0xff},
 		},
 		{
-			[]byte{0xff, 0xaa},
-			[]byte{0x00, 0x56},
+			[]byte{0xff, 0xff},
+			[]byte{0, 0, 0, 0, 0, 0, 0xff, 0xff},
+			[]byte{0, 0, 0, 0, 0, 0, 0xff, 0xff},
 		},
 	}
 	for _, tt := range vector {
-		testname := fmt.Sprintf("%v\n", tt.input)
+		testname := fmt.Sprintf("%v,%v\n", tt.a, tt.b)
 		t.Run(testname, func(t *testing.T) {
-			have := TwosComplement(tt.input)
+			have := Or(tt.a, tt.b)
 			if !bytes.Equal(have, tt.want) {
 				t.Errorf("Want %v, have %v\n", tt.want, have)
 			}
 		})
 	}
 
-	// Property: TwosComplement twice yields the input
-	check(t, func(input []byte) bool {
-		doublyInverted := TwosComplement(TwosComplement(input))
-		ok := reflect.DeepEqual(doublyInverted, input)
-		if !ok {
-			fmt.Printf("Failing doublyInverted: %v\n", doublyInverted)
+	// Property: len(a|b) == len(a)
+	check(t, func(a, b []byte) bool {
+		ored := Or(a, b)
+		a, b = PadToEqualSize(a, b)
+		return len(ored) == len(a) && len(ored) == len(b)
+	})
+
+	// Property: a | 0 == a
+	check(t, func(a []byte) bool {
+		zero := make([]byte, len(a))
+		for i, _ := range zero {
+			zero[i] = 0
 		}
-		return ok
+		return Equivalent(a, Or(a, zero))
+	})
+
+	// Property: a | -1 == -1
+	check(t, func(a []byte) bool {
+		minus1 := make([]byte, len(a))
+		for i, _ := range minus1 {
+			minus1[i] = 0xff
+		}
+		return Equivalent(minus1, Or(a, minus1))
+	})
+}
+
+func TestPopcount(t *testing.T) {
+	var vector = []struct {
+		input []byte
+		want  []byte
+	}{
+		{
+			[]byte{0, 0, 0, 0},
+			[]byte{},
+		},
+		{
+			[]byte{0xff, 0},
+			[]byte{8},
+		},
+		{
+			[]byte{0xff, 0xaa},
+			[]byte{12},
+		},
+		{
+			[]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+			[]byte{1, 0},
+		},
+	}
+	for _, tt := range vector {
+		testname := fmt.Sprintf("%v\n", tt.input)
+		t.Run(testname, func(t *testing.T) {
+			have := Popcount(tt.input)
+			if !bytes.Equal(have, tt.want) {
+				t.Errorf("Want %v, have %v\n", tt.want, have)
+			}
+		})
+	}
+
+	// Property: len(popcount(a)) <= max(1, len(a)/32)
+	check(t, func(a []byte) bool {
+		lpc := len(Popcount(a))
+		return lpc == 1 || lpc <= len(a)/32
 	})
 }
 
@@ -778,89 +625,242 @@ func TestStringToBytes(t *testing.T) {
 	})
 }
 
-func TestBytesToHex(t *testing.T) {
+func TestSubtract(t *testing.T) {
 	var vector = []struct {
-		input  []byte
-		nBytes uint
-		want   string
+		a    []byte
+		b    []byte
+		want []byte
 	}{
 		{
 			[]byte{},
-			1,
-			"0x00",
+			[]byte{},
+			[]byte{},
 		},
 		{
 			[]byte{0},
-			1,
-			"0x00",
+			[]byte{0},
+			[]byte{0},
 		},
 		{
-			[]byte{0, 0},
-			1,
-			"0x0000",
+			[]byte{0x20, 0x20},
+			[]byte{0x10, 0x10},
+			[]byte{0x10, 0x10},
 		},
 		{
-			[]byte{0, 0},
-			2,
-			"0x0000",
-		},
-		{
-			[]byte{0, 0},
-			3,
-			"0x000000",
-		},
-		{
-			[]byte{0xff},
-			1,
-			"0xff",
-		},
-		{
-			[]byte{0x02, 0x55},
-			2,
-			"0x0255",
-		},
-		{
-			[]byte{0x02, 0x22},
-			2,
-			"0x0222",
-		},
-		{
-			[]byte{0x7f, 0x00},
-			2,
-			"0x7f00",
-		},
-		{
-			[]byte{0x7f, 0x00},
-			1,
-			"0x7f00",
-		},
-		{
-			[]byte{0x7f, 0x00},
-			6,
-			"0x000000007f00",
-		},
-		{
-			[]byte{0xff, 0xaa},
-			2,
-			"0xffaa",
+			[]byte{0xff, 0xff},
+			[]byte{0xff, 0xff},
+			[]byte{0x00, 0x00},
 		},
 	}
 	for _, tt := range vector {
-		testname := fmt.Sprintf("%v\n", tt.input)
+		testname := fmt.Sprintf("%v,%v\n", tt.a, tt.b)
 		t.Run(testname, func(t *testing.T) {
-			have := BytesToHex(tt.input, tt.nBytes)
-			if have != tt.want {
+			have := Subtract(tt.a, tt.b)
+			if !bytes.Equal(have, tt.want) {
 				t.Errorf("Want %v, have %v\n", tt.want, have)
 			}
 		})
 	}
 
-	// Property: BytesToHex does not truncate
-	check(t, func(a []byte, n uint) bool {
-		if uint(len(a)) >= n {
-			return reflect.DeepEqual(BytesToHex(a, n), BytesToHex(a, uint(len(a))))
-		} else {
-			return strings.HasSuffix(BytesToHex(a, n)[2:], BytesToHex(a, uint(len(a)))[2:])
+	// Property: a - b == -(b - a)
+	check(t, func(a, b []byte) bool {
+		amb := Subtract(a, b)
+		bma := Subtract(b, a)
+		bmaTwosComplement := TwosComplement(bma)
+		ok := reflect.DeepEqual(amb, bmaTwosComplement)
+		if !ok {
+			fmt.Printf("Failing a-b: %v, -(b-a): %v\n", amb, bmaTwosComplement)
 		}
+		return ok
+	})
+
+	// Property: a - 0 == a
+	check(t, func(a []byte) bool {
+		subtractingEmptyZero := Subtract(a, []byte{})
+		subtractingNonEmptyZero := Subtract(a, []byte{0, 0, 0})
+		ok := reflect.DeepEqual(a, subtractingEmptyZero) && Equivalent(a, subtractingNonEmptyZero)
+		if !ok {
+			fmt.Printf("Failing subtractingEmptyZero: %v, subtractingNonEmptyZero: %v\n", subtractingEmptyZero, subtractingNonEmptyZero)
+		}
+		return ok
+	})
+
+	// Property: 0 - a == -a
+	check(t, func(a []byte) bool {
+		subtractingFromEmptyZero := Subtract([]byte{}, a)
+		ok := reflect.DeepEqual(TwosComplement(a), subtractingFromEmptyZero)
+		if !ok {
+			fmt.Printf("Failing subtractingFromEmptyZero: %v\n", subtractingFromEmptyZero)
+		}
+		return ok
+	})
+}
+
+func TestTrimLeadingZeros(t *testing.T) {
+	var vector = []struct {
+		input []byte
+		want  []byte
+	}{
+		{
+			[]byte{0, 0, 0, 0},
+			[]byte{},
+		},
+		{
+			[]byte{0xff, 0},
+			[]byte{0xff, 0},
+		},
+		{
+			[]byte{0, 0xff},
+			[]byte{0xff},
+		},
+		{
+			[]byte{0xff, 0xff},
+			[]byte{0xff, 0xff},
+		},
+	}
+	for _, tt := range vector {
+		testname := fmt.Sprintf("%v\n", tt.input)
+		t.Run(testname, func(t *testing.T) {
+			have := trimLeadingZeros(tt.input)
+			if !bytes.Equal(have, tt.want) {
+				t.Errorf("Want %v, have %v\n", tt.want, have)
+			}
+		})
+	}
+
+	// Property: trimmed will be a smaller slice or exactly equal to input
+	check(t, func(a []byte) bool {
+		trimmed := trimLeadingZeros(a)
+		ok := len(trimmed) < len(a) || reflect.DeepEqual(trimmed, a)
+		if !ok {
+			fmt.Printf("Failing trimmed: %v\n", trimmed)
+		}
+		return ok
+	})
+
+	// Property: trimmed is a suffix of the original
+	check(t, func(a []byte) bool {
+		trimmed := trimLeadingZeros(a)
+		ok := RightIsSuffixOfLeft(a, trimmed)
+		if !ok {
+			fmt.Printf("Failing trimmed: %v\n", trimmed)
+		}
+		return ok
+	})
+
+	// Property: trimmed is equivalent to input
+	check(t, func(a []byte) bool {
+		trimmed := trimLeadingZeros(a)
+		ok := Equivalent(a, trimmed)
+		if !ok {
+			fmt.Printf("Failing trimmed: %v\n", trimmed)
+		}
+		return ok
+	})
+}
+
+func TestTwosComplement(t *testing.T) {
+	var vector = []struct {
+		input []byte
+		want  []byte
+	}{
+		{
+			[]byte{},
+			[]byte{},
+		},
+		{
+			[]byte{0xff},
+			[]byte{0x01},
+		},
+		{
+			[]byte{0x7f, 0},
+			[]byte{0x81, 0x00},
+		},
+		{
+			[]byte{0xff, 0xaa},
+			[]byte{0x00, 0x56},
+		},
+	}
+	for _, tt := range vector {
+		testname := fmt.Sprintf("%v\n", tt.input)
+		t.Run(testname, func(t *testing.T) {
+			have := TwosComplement(tt.input)
+			if !bytes.Equal(have, tt.want) {
+				t.Errorf("Want %v, have %v\n", tt.want, have)
+			}
+		})
+	}
+
+	// Property: TwosComplement twice yields the input
+	check(t, func(input []byte) bool {
+		doublyInverted := TwosComplement(TwosComplement(input))
+		ok := reflect.DeepEqual(doublyInverted, input)
+		if !ok {
+			fmt.Printf("Failing doublyInverted: %v\n", doublyInverted)
+		}
+		return ok
+	})
+}
+
+func TestXor(t *testing.T) {
+	var vector = []struct {
+		a    []byte
+		b    []byte
+		want []byte
+	}{
+		{
+			[]byte{0, 0, 0, 0},
+			[]byte{0, 0, 0, 0},
+			[]byte{0, 0, 0, 0},
+		},
+		{
+			[]byte{0x10, 0x10},
+			[]byte{0x20, 0x20},
+			[]byte{0x30, 0x30},
+		},
+		{
+			[]byte{0xff, 0xff},
+			[]byte{0xff, 0xff},
+			[]byte{0x00, 0x00},
+		},
+		{
+			[]byte{0xff, 0xff},
+			[]byte{0, 0, 0, 0, 0, 0, 0xff, 0xff},
+			[]byte{0, 0, 0, 0, 0, 0, 0x00, 0x00},
+		},
+	}
+	for _, tt := range vector {
+		testname := fmt.Sprintf("%v,%v\n", tt.a, tt.b)
+		t.Run(testname, func(t *testing.T) {
+			have := Xor(tt.a, tt.b)
+			if !bytes.Equal(have, tt.want) {
+				t.Errorf("Want %v, have %v\n", tt.want, have)
+			}
+		})
+	}
+
+	// Property: len(a^b) == len(a)
+	check(t, func(a, b []byte) bool {
+		xored := Xor(a, b)
+		a, b = PadToEqualSize(a, b)
+		return len(xored) == len(a) && len(xored) == len(b)
+	})
+
+	// Property: a ^ 0 == a
+	check(t, func(a []byte) bool {
+		zero := make([]byte, len(a))
+		for i, _ := range zero {
+			zero[i] = 0
+		}
+		return Equivalent(a, Xor(a, zero))
+	})
+
+	// Property: a ^ -1 == ~a
+	check(t, func(a []byte) bool {
+		minus1 := make([]byte, len(a))
+		for i, _ := range minus1 {
+			minus1[i] = 0xff
+		}
+		return Equivalent(Not(a), Xor(a, minus1))
 	})
 }
