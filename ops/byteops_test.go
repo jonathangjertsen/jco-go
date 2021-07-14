@@ -16,48 +16,6 @@ func check(t *testing.T, f interface{}) {
 	}
 }
 
-func leftIsGreater(left, right []byte) bool {
-	left, right = PadToEqualSize(left, right)
-	for i, l := range left {
-		r := right[i]
-		if l > r {
-			return true
-		} else if l < r {
-			return false
-		}
-	}
-	return false
-}
-
-func leftIsGreaterOrEqual(left, right []byte) bool {
-	left, right = PadToEqualSize(left, right)
-	if len(left) == 0 {
-		return true
-	}
-	for i, l := range left {
-		r := right[i]
-		if l >= r {
-			return true
-		} else if l < r {
-			return false
-		}
-	}
-	return false
-}
-
-func rightIsSuffixOfLeft(left, right []byte) bool {
-	if len(left) < len(right) {
-		return false
-	}
-	offset := len(left) - len(right)
-	for i, b := range right {
-		if b != left[i+offset] {
-			return false
-		}
-	}
-	return true
-}
-
 func TestByteAdd(t *testing.T) {
 	// Vector part
 	var vector = []struct {
@@ -221,7 +179,7 @@ func TestTrimLeadingZeros(t *testing.T) {
 	// Property: trimmed is a suffix of the original
 	check(t, func(a []byte) bool {
 		trimmed := trimLeadingZeros(a)
-		ok := rightIsSuffixOfLeft(a, trimmed)
+		ok := RightIsSuffixOfLeft(a, trimmed)
 		if !ok {
 			fmt.Printf("Failing trimmed: %v\n", trimmed)
 		}
@@ -294,7 +252,7 @@ func TestAdd(t *testing.T) {
 	// Property: a+b >= a and a+b >= b
 	check(t, func(a, b []byte) bool {
 		added := Add(a, b)
-		ok := leftIsGreaterOrEqual(added, a) && leftIsGreaterOrEqual(added, b)
+		ok := LeftIsGreaterOrEqual(added, a) && LeftIsGreaterOrEqual(added, b)
 		if !ok {
 			fmt.Printf("Failing added: %v\n", added)
 		}

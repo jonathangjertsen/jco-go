@@ -160,6 +160,35 @@ func Equivalent(left, right []byte) bool {
 	return reflect.DeepEqual(left, right)
 }
 
+func LeftIsGreater(left, right []byte) bool {
+	left, right = PadToEqualSize(left, right)
+	for i, l := range left {
+		r := right[i]
+		if l > r {
+			return true
+		} else if l < r {
+			return false
+		}
+	}
+	return false
+}
+
+func LeftIsGreaterOrEqual(left, right []byte) bool {
+	left, right = PadToEqualSize(left, right)
+	if len(left) == 0 {
+		return true
+	}
+	for i, l := range left {
+		r := right[i]
+		if l >= r {
+			return true
+		} else if l < r {
+			return false
+		}
+	}
+	return false
+}
+
 // Returns the number of bits needed to represent the input
 func Nbits(input []byte) []byte {
 	byteNbits := func(b byte) byte {
@@ -229,6 +258,19 @@ func Popcount(input []byte) []byte {
 		answerInt += uint64(bits.OnesCount(uint(b)))
 	}
 	return uint64ToBytes(answerInt)
+}
+
+func RightIsSuffixOfLeft(left, right []byte) bool {
+	if len(left) < len(right) {
+		return false
+	}
+	offset := len(left) - len(right)
+	for i, b := range right {
+		if b != left[i+offset] {
+			return false
+		}
+	}
+	return true
 }
 
 // Subtracts b from a, both representing big-endian numbers
