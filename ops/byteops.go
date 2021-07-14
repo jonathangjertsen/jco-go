@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/big"
 	"math/bits"
-	"reflect"
 )
 
 const (
@@ -221,7 +220,12 @@ func Clz(input []byte) []byte {
 // Returns whether the two are equivalent except for any leading zeros
 func Equivalent(left, right []byte) bool {
 	left, right = PadToEqualSize(left, right)
-	return reflect.DeepEqual(left, right)
+	for i, li := range left {
+		if li != right[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // Returns whether the left argument represents a strictly greater number than the right argument
