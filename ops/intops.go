@@ -1,5 +1,41 @@
 package ops
 
+// Returns whichever is greatest of a and b
+func intmax(a, b int) int {
+	if a > b {
+		return a
+	} else {
+		return b
+	}
+}
+
+// Returns whichever is smallest of a and b
+func intmin(a, b int) int {
+	if a < b {
+		return a
+	} else {
+		return b
+	}
+}
+
+// Returns whichever is greatest of a and b
+func uintmax(a, b uint) uint {
+	if a > b {
+		return a
+	} else {
+		return b
+	}
+}
+
+// Returns whichever is smallest of a and b
+func uintmin(a, b uint) uint {
+	if a < b {
+		return a
+	} else {
+		return b
+	}
+}
+
 // Returns the number of bytes required to hold the number of bits
 func BitsToBytes(bits uint64) uint64 {
 	return (bits + 7) / 8

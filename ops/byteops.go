@@ -14,11 +14,16 @@ const (
 
 // Adds two bytes, returning the sum (i.e.: (a+b)%256) and carry (i.e.: (a+b)/256)
 func byteAdd(a, b byte) (byte, byte) {
+	// Do regular sum modulo 256
 	sum := a + b
+
+	// If it overflowed we want a carry
+	// In that case the sum will be less than at least one of the inputs
 	var carry byte = 0
 	if sum < a || sum < b {
 		carry = 1
 	}
+
 	return sum, carry
 }
 
@@ -32,19 +37,15 @@ func firstNonZeroIndex(input []byte) uint {
 	return Ulen(input)
 }
 
-// Returns whichever is greatest of a and b
-func intmax(a, b int) int {
-	if a > b {
-		return a
-	} else {
-		return b
-	}
-}
-
 // Adds value to the front of the slice
 func prepend(slice []byte, value byte) []byte {
+	// Allocate an extra slot for the copy operation
 	result := append(slice, 0)
+
+	// Move everything one step to the right
 	copy(result[1:], result)
+
+	// Then we can fill in the new value
 	result[0] = value
 	return result
 }
@@ -57,10 +58,13 @@ func trimLeadingZeros(input []byte) []byte {
 // Converts a uint64 to a big-endian byte array
 func uint64ToBytes(input uint64) []byte {
 	if input == 0 {
+		// Canonical zero
 		return []byte{}
 	} else if input < 256 {
+		// Speed hack for small inputs
 		return []byte{byte(input)}
 	} else {
+		// In the general case, defer to binary.BigEndian
 		answer := make([]byte, 8)
 		binary.BigEndian.PutUint64(answer, input)
 		return trimLeadingZeros(answer)
@@ -70,14 +74,22 @@ func uint64ToBytes(input uint64) []byte {
 // Adds a and b, both representing big-endian numbers
 func Add(a, b []byte) []byte {
 	a, b = PadToEqualSize(a, b)
+
+	// We will iterate from LSB to MSB for the carry to work
 	a = ByteReverse(a)
 	b = ByteReverse(b)
 	answer := make([]byte, len(a))
 	for i := 0; i < len(a); i++ {
+		// Get the sum and carry of the a and b parts
 		sum, carry := byteAdd(a[i], b[i])
+
+		// Add the sum to the existing value in this slot, which
+		// may also overflow in which case we need an additional carry
 		previousCarryPlusSum, extraCarry := byteAdd(answer[i], sum)
 		carry += extraCarry
 		answer[i] = previousCarryPlusSum
+
+		// Add the carry to the next slot, or create a slot for it if this is the last one
 		if i+1 >= len(answer) {
 			if carry > 0 {
 				answer = append(answer, carry)
@@ -86,15 +98,17 @@ func Add(a, b []byte) []byte {
 			answer[i+1] += carry
 		}
 	}
+
+	// Flip back to big endian
 	return ByteReverse(answer)
 }
 
-// Returns a AND b
+// Returns bitwise a AND b
 func And(a, b []byte) []byte {
 	return BinaryOp(a, b, func(ai, bi byte) byte { return ai & bi })
 }
 
-// Returns OP(a, b)
+// Returns bitwise OP(a, b)
 func BinaryOp(a, b []byte, elemfunc func(ai, bi byte) byte) []byte {
 	a, b = PadToEqualSize(a, b)
 	c := make([]byte, len(a))
@@ -107,8 +121,12 @@ func BinaryOp(a, b []byte, elemfunc func(ai, bi byte) byte) []byte {
 // Returns the binary string representation of the bytes
 func BytesToBin(a []byte, nBytes uint) string {
 	parts := []byte("0b")
+
+	// Iterate over each byte MSB first
 	for _, b := range a {
+		// Iterate over each bit in the byte MSb first
 		for i := 7; i >= 0; i-- {
+			// If the bit is set, emit "1", else emit "0"
 			mask := byte(1 << i)
 			masked := mask & b
 			if masked == 0 {
@@ -128,6 +146,7 @@ func BytesToDec(a []byte, nBytes uint) string {
 
 // Returns the hexadecimal string representation of the bytes
 func BytesToHex(a []byte, nBytes uint) string {
+	// Pad with zeros up to nBytes or len(a), whichever is greater
 	if nBytes > Ulen(a) {
 		a = PrependZeros(a, nBytes-Ulen(a))
 	}
@@ -139,7 +158,8 @@ func BytesToHex(a []byte, nBytes uint) string {
 func ByteReverse(input []byte) []byte {
 	reversed := make([]byte, len(input))
 	copy(reversed, input)
-	for i, j := 0, len(reversed)-1; i < j; i, j = i+1, j-1 {
+	for i := 0; i < len(reversed)/2; i++ {
+		j := len(reversed) - i - 1
 		reversed[i], reversed[j] = reversed[j], reversed[i]
 	}
 	return reversed
@@ -148,10 +168,13 @@ func ByteReverse(input []byte) []byte {
 // Returns the number of leading zeros in the input
 func Clz(input []byte) []byte {
 	answerInt := uint64(0)
+
 	for _, b := range input {
 		if b == 0 {
+			// As long as we see zero-byte just keep adding 8
 			answerInt += 8
 		} else {
+			// Once we encounter a non-zero byte, add up the leading zeroes in that and we are done
 			answerInt += uint64(bits.LeadingZeros8(b))
 			break
 		}
@@ -165,8 +188,11 @@ func Equivalent(left, right []byte) bool {
 	return reflect.DeepEqual(left, right)
 }
 
+// Returns whether the left argument represents a strictly greater number than the right argument
 func LeftIsGreater(left, right []byte) bool {
 	left, right = PadToEqualSize(left, right)
+
+	// On the first byte that differs we know the result
 	for i, l := range left {
 		r := right[i]
 		if l > r {
@@ -175,14 +201,21 @@ func LeftIsGreater(left, right []byte) bool {
 			return false
 		}
 	}
+
+	// They are equal
 	return false
 }
 
+// Returns whether the left arguments represents a greater or equal number to the right argument
 func LeftIsGreaterOrEqual(left, right []byte) bool {
 	left, right = PadToEqualSize(left, right)
+
+	// Zeros are equal
 	if len(left) == 0 {
 		return true
 	}
+
+	// On the first byte that differs we know the result
 	for i, l := range left {
 		r := right[i]
 		if l >= r {
@@ -191,7 +224,8 @@ func LeftIsGreaterOrEqual(left, right []byte) bool {
 			return false
 		}
 	}
-	return false
+
+	panic("Invalid result for LeftIsGreaterOrEqual")
 }
 
 // Returns the number of bits needed to represent the input
@@ -199,6 +233,8 @@ func Nbits(input []byte) []byte {
 	trimmed := trimLeadingZeros(input)
 	sumUint64 := uint64(0)
 	if len(trimmed) > 0 {
+		// Since the input has been trimmed, the result must be the number of bits
+		// to represent the first byte plus the bit length of everything else
 		sumUint64 += uint64(NBitsByte(trimmed[0])) + uint64((len(trimmed)-1)*8)
 	}
 	return uint64ToBytes(sumUint64)
@@ -237,25 +273,27 @@ func Popcount(input []byte) []byte {
 }
 
 // Prepends n zeros to the slice
+// n is capped at MAX_SLICE_SIZE to avoid running out of memory
 func PrependZeros(slice []byte, n uint) []byte {
-	if n > MAX_SLICE_SIZE {
-		n = MAX_SLICE_SIZE
-	}
-
-	zeros := make([]byte, n)
-	return append(zeros, slice...)
+	return append(make([]byte, uintmin(n, MAX_SLICE_SIZE)), slice...)
 }
 
+// Returns whether the len(right) last bytes of left are equal to right
 func RightIsSuffixOfLeft(left, right []byte) bool {
+	// Impossible if right is longer than left
 	if len(left) < len(right) {
 		return false
 	}
+
+	// Check one by one starting from where the right would occur in left
 	offset := len(left) - len(right)
 	for i, b := range right {
 		if b != left[i+offset] {
 			return false
 		}
 	}
+
+	// No differences found
 	return true
 }
 
@@ -287,9 +325,12 @@ func Truncate(a []byte, n uint) []byte {
 
 // Returns -a
 func TwosComplement(input []byte) []byte {
+	// Special case for 0-bit zero
 	if len(input) == 0 {
 		return input
 	}
+
+	// Otherwise -a is ~a+1
 	return Truncate(Add(Not(input), []byte{1}), Ulen(input))
 }
 

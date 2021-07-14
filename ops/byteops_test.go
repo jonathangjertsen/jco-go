@@ -58,12 +58,23 @@ func TestAdd(t *testing.T) {
 		})
 	}
 
-	// Property: len(a+b) >= len(a)
+	// Property: len(a+b) >= len(a), len(a+b) >= len(b)
 	check(t, func(a, b []byte) bool {
 		added := Add(a, b)
 		ok := len(added) >= len(a) && len(added) >= len(b)
 		if !ok {
-			fmt.Printf("Failing added: %v\n", added)
+			fmt.Printf("Failing added: %v, len(added): %v, len(a)=%v, len(b)=%v\n", added, len(added), len(a), len(b))
+
+		}
+		return ok
+	})
+
+	// Property: a+b adds at most one byte
+	check(t, func(a, b []byte) bool {
+		added := Add(a, b)
+		ok := (len(added) <= len(a)+1) || (len(added) <= len(b)+1)
+		if !ok {
+			fmt.Printf("Failing added: %v, len(added): %v, len(a)+1=%v, len(b)+1=%v\n", added, len(added), len(a)+1, len(b)+1)
 		}
 		return ok
 	})
