@@ -61,18 +61,12 @@ var RootCmd = &cobra.Command{
 	DisableAutoGenTag: true,
 }
 
-func Fatal(message string) {
-	panic(message)
+func init() {
+	RootCmd.Flags().UintP("bits", "b", 32, "Number of bits")
 }
 
-func Interactive() {
-	fmt.Printf("Interactive")
-}
-
-/**
- * Custom flag parsing because Cobra does not want to support negative numbers:
- * 	 https://github.com/spf13/cobra/issues/124
- */
+// Custom flag parsing because Cobra does not want to support negative numbers:
+// 	 https://github.com/spf13/cobra/issues/124
 func parseFlags(args []string) *Flags {
 	flags := Flags{}
 	opts := map[string]string{
@@ -127,10 +121,6 @@ func parseFlags(args []string) *Flags {
 	return &flags
 }
 
-func init() {
-	RootCmd.Flags().UintP("bits", "b", 32, "Number of bits")
-}
-
 func Execute() {
 	cobra.MousetrapHelpText = ""
 	RootCmd.CompletionOptions.DisableDefaultCmd = true
@@ -138,4 +128,12 @@ func Execute() {
 	if err := RootCmd.Execute(); err != nil {
 		Fatal(err.Error())
 	}
+}
+
+func Fatal(message string) {
+	panic(message)
+}
+
+func Interactive() {
+	fmt.Printf("Interactive")
 }

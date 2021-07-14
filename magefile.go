@@ -18,6 +18,76 @@ const (
 	EXE = "jco"
 )
 
+func build(os, arch, executable string, args []string) error {
+	command := []string{
+		"build",
+		"-o", executablePath(os, arch, executable),
+	}
+	command = append(command, args...)
+	command = append(command, ".")
+	output, err := run("go", command, map[string]string{
+		"GOOS":   os,
+		"GOARCH": arch,
+	})
+	fmt.Print(output)
+	return err
+}
+
+func executablePath(os, arch, executable string) string {
+	extension := ""
+	if os == "windows" {
+		extension = ".exe"
+	}
+	return fmt.Sprintf("bin/%s-%s/%s%s", os, arch, executable, extension)
+}
+
+func emitFixedTestOutput(output string) {
+	for _, line := range strings.Split(output, "\n") {
+		if strings.Contains(line, "[no test files]") {
+			continue
+		}
+		if strings.HasPrefix(line, "ok") {
+			color.HiGreen(line)
+		} else if strings.Contains(line, "FAIL") {
+			color.HiRed(line)
+		} else {
+			color.New().Println(line)
+		}
+	}
+}
+
+func parallelBuild(builders [](func() error)) {
+	var wg sync.WaitGroup
+
+	for _, builder := range builders {
+		wg.Add(1)
+		go (func(builder func() error, wg *sync.WaitGroup) {
+			defer wg.Done()
+			builder()
+		})(builder, &wg)
+	}
+	wg.Wait()
+}
+
+func run(program string, args []string, env map[string]string) (string, error) {
+	// Make string representation of command
+	fullArgs := append([]string{program}, args...)
+	cmdStr := strings.Join(fullArgs, " ")
+
+	// Make string representation of environment
+	envStrBuf := new(bytes.Buffer)
+	for key, value := range env {
+		fmt.Fprintf(envStrBuf, "%s=\"%s\", ", key, value)
+	}
+	envStr := string(bytes.TrimRight(envStrBuf.Bytes(), ", "))
+
+	// Show info
+	fmt.Println("Running '" + cmdStr + "'" + " with env " + envStr)
+
+	// Run
+	return sh.OutputWith(env, program, args...)
+}
+
 // Builds an executable for Windows AMD64
 func BuildWindowsAmd64() error {
 	return build("windows", "amd64", EXE, []string{"-tags", "release"})
@@ -46,6 +116,87 @@ func BuildLinuxArm64() error {
 // Builds an executable for this computer
 func Build() error {
 	return build(runtime.GOOS, runtime.GOARCH, EXE, []string{"-tags", "release"})
+}
+
+// Builds an executable for all supported platforms
+func BuildAll() {
+	parallelBuild([](func() error){
+		BuildWindowsAmd64,
+		BuildMacAmd64,
+		BuildMacArm64,
+		BuildLinuxAmd64,
+		BuildLinuxArm64,
+		Debug,
+	})
+}
+
+// Runs everything that a CI system might want to do
+func Ci() {
+	mg.Deps(CheckRepoClean)
+	mg.Deps(Check)
+	mg.Deps(Test)
+	mg.Deps(TestExtensively)
+	mg.Deps(BuildAll)
+	mg.Deps(Run)
+	mg.Deps(RunRelease)
+	color.HiGreen("All CI steps passed")
+}
+
+// Runs go vet and go fmt, and checks that they don't say anything
+func Check() error {
+	output, err := run("go", []string{"vet", "./..."}, map[string]string{})
+	if err != nil {
+		return err
+	}
+	if output != "" {
+		return fmt.Errorf("go vet says something:\n%s", output)
+	}
+
+	output, err = run("go", []string{"fmt", "./..."}, map[string]string{})
+	if err != nil {
+		return err
+	}
+	if output != "" {
+		return fmt.Errorf("go fmt says something:\n%s", output)
+	}
+
+	output, err = run("python", []string{"--version"}, map[string]string{})
+	if err != nil {
+		fmt.Printf("Python not found, skipping")
+	} else {
+		output, err = run("python", []string{"tools/sort_functions.py", "all"}, map[string]string{})
+		if err != nil {
+			fmt.Printf("Error in sort_functions.py dry run")
+		} else {
+			output, err = run("python", []string{"tools/sort_functions.py", "all", "--mode=in-place"}, map[string]string{})
+			if err != nil {
+				fmt.Printf("Error in sort_functions.py in-place, the whole thing might be jacked")
+				return err
+			} else {
+				CheckRepoClean()
+			}
+		}
+	}
+
+	return nil
+}
+
+// Checks that the repo is clean
+func CheckRepoClean() error {
+	output, err := run("git", []string{"status", "--porcelain"}, map[string]string{})
+	if err != nil {
+		return err
+	}
+	if output != "" {
+		return fmt.Errorf("git status --porcelain says something:\n%s", output)
+	}
+	return nil
+}
+
+// Cleans the bin directory
+func Clean() error {
+	fmt.Println("Removing bin")
+	return sh.Rm("bin")
 }
 
 // Builds a debug executable for this computer
@@ -79,135 +230,16 @@ func RunRelease() error {
 	return nil
 }
 
-// Builds an executable for all supported platforms
-func BuildAll() {
-	parallelBuild([](func() error){
-		BuildWindowsAmd64,
-		BuildMacAmd64,
-		BuildMacArm64,
-		BuildLinuxAmd64,
-		BuildLinuxArm64,
-		Debug,
-	})
-}
-
-// Runs everything that a CI system might want to do
-func Ci() {
-	mg.Deps(Check)
-	mg.Deps(CheckRepoClean)
-	mg.Deps(Test)
-	mg.Deps(BuildAll)
-	mg.Deps(Run)
-	mg.Deps(RunRelease)
-}
-
-// Runs go vet and go fmt, and checks that they don't say anything
-func Check() error {
-	output, err := run("go", []string{"vet", "./..."}, map[string]string{})
-	if err != nil {
-		return err
-	}
-	if output != "" {
-		return fmt.Errorf("go vet says something:\n%s", output)
-	}
-
-	output, err = run("go", []string{"fmt", "./..."}, map[string]string{})
-	if err != nil {
-		return err
-	}
-	if output != "" {
-		return fmt.Errorf("go fmt says something:\n%s", output)
-	}
-	return nil
-}
-
-// Checks that the repo is clean
-func CheckRepoClean() error {
-	output, err := run("git", []string{"status", "--porcelain"}, map[string]string{})
-	if err != nil {
-		return err
-	}
-	if output != "" {
-		return fmt.Errorf("git status --porcelain says something:\n%s", output)
-	}
-	return nil
-}
-
 // Runs go test in verbose mode and prettifies the output
 func Test() error {
 	output, err := run("go", []string{"test", "-v", "./..."}, map[string]string{})
-	for _, line := range strings.Split(output, "\n") {
-		if strings.Contains(line, "[no test files]") {
-			continue
-		}
-		if strings.HasPrefix(line, "ok") {
-			color.HiGreen(line)
-		} else if strings.Contains(line, "FAIL") {
-			color.HiRed(line)
-		} else {
-			color.New().Println(line)
-		}
-	}
+	emitFixedTestOutput(output)
 	return err
 }
 
-// Cleans the bin directory
-func Clean() error {
-	fmt.Println("Removing bin")
-	return sh.Rm("bin")
-}
-
-func parallelBuild(builders [](func() error)) {
-	var wg sync.WaitGroup
-
-	for _, builder := range builders {
-		wg.Add(1)
-		go (func(builder func() error, wg *sync.WaitGroup) {
-			defer wg.Done()
-			builder()
-		})(builder, &wg)
-	}
-	wg.Wait()
-}
-
-func executablePath(os, arch, executable string) string {
-	extension := ""
-	if os == "windows" {
-		extension = ".exe"
-	}
-	return fmt.Sprintf("bin/%s-%s/%s%s", os, arch, executable, extension)
-}
-
-func build(os, arch, executable string, args []string) error {
-	command := []string{
-		"build",
-		"-o", executablePath(os, arch, executable),
-	}
-	command = append(command, args...)
-	command = append(command, ".")
-	output, err := run("go", command, map[string]string{
-		"GOOS":   os,
-		"GOARCH": arch,
-	})
-	fmt.Print(output)
+// Runs go test many times and prettifies the output
+func TestExtensively() error {
+	output, err := run("go", []string{"test", "./...", "-count=1000"}, map[string]string{})
+	emitFixedTestOutput(output)
 	return err
-}
-
-func run(program string, args []string, env map[string]string) (string, error) {
-	// Make string representation of command
-	fullArgs := append([]string{program}, args...)
-	cmdStr := strings.Join(fullArgs, " ")
-
-	// Make string representation of environment
-	envStrBuf := new(bytes.Buffer)
-	for key, value := range env {
-		fmt.Fprintf(envStrBuf, "%s=\"%s\", ", key, value)
-	}
-	envStr := string(bytes.TrimRight(envStrBuf.Bytes(), ", "))
-
-	// Show info
-	fmt.Println("Running '" + cmdStr + "'" + " with env " + envStr)
-
-	// Run
-	return sh.OutputWith(env, program, args...)
 }
