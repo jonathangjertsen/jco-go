@@ -1,0 +1,27 @@
+name: build
+on: [push]
+jobs:
+  Build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone repo
+        uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16.5
+      - name: build
+        run: |
+          go install github.com/magefile/mage
+          go install .
+          mage ci
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: bin
+          path: |
+            bin/darwin-amd64
+            bin/darwin-arm64
+            bin/linux-amd64
+            bin/linux-arm64
+            bin/windows-amd64
