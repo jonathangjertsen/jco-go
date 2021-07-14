@@ -138,7 +138,7 @@ def function_name_and_receiver_type(function: str) -> str:
             receiver = after_func[receiver_start_idx:receiver_end_idx]
             receiver_type = receiver.split(" ")[-1]
             return name, receiver_type
-    return ""
+    raise ValueError(function)
 
 def name_key(name: str) -> tuple[int]:
     if not name:

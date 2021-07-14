@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	VERSION = "v1.0.0"
+	VERSION = "v1.0.1"
 )
 
 type Flags struct {
@@ -57,8 +57,8 @@ func parseFlags(args []string) *Flags {
 		Fatal(fmt.Sprintf("Invalid value for -b: %s", opts["-b"]))
 	}
 	if bits%8 != 0 {
-		bitsRounded := (bits + 7) / 8
-		fmt.Printf("Warning: -b %v will be rounded up to %v", bits, bitsRounded)
+		bitsRounded := 8 * ((bits + 7) / 8)
+		fmt.Printf("Warning: -b %v is rounded up to %v\n\n", bits, bitsRounded)
 		bits = bitsRounded
 	}
 	flags.bits = bits
@@ -121,6 +121,7 @@ func Usage() {
 	fmt.Printf(`jco (Jonathan's converter) %s
 
 Usage:
+
 	Show information about <number>
 		jco <number>
 
@@ -135,6 +136,18 @@ Usage:
 
 	Show one-liner version
 		jco --version
+
+Below is a list of the operations when running jco <number>:
+
+	twos_complement:        Two's complement (depends on bit width)
+	popcount:               Number of bits that are 1
+	clz:                    Number of leading zeros
+	nbits:                  Number of bits needed to represent the number
+	reverse_bitorder        Reverses the bit order within each byte    (0b11100011 -> 0b11000111)
+	reverse_nibbleorder     Reverses the nibble order within each byte (0xab -> 0xba)
+	reverse_byteorder       Reverses the byte order
+	reverse_bitstring       Interprets the input as a stream of bits, and reverses them.
+	                        Equivalent to reverse_bitorder followed by reverse_byteorder.
 `, VERSION)
 }
 

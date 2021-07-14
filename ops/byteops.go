@@ -147,10 +147,16 @@ func BinaryOp(a, b []byte, elemfunc func(ai, bi byte) byte) []byte {
 	return c
 }
 
+// Returns the input with the bit order reversed when interpreted as a stream of bytes
+// Leading zeros in the output (due to trailing zeros in the input) are NOT removed
+func BitstringReverse(input []byte) []byte {
+	return UnaryOp(ByteReverse(input), bits.Reverse8)
+}
+
 // Returns the input with the bit order reversed
 // Leading zeros in the output (due to trailing zeros in the input) are NOT removed
 func BitReverse(input []byte) []byte {
-	return UnaryOp(ByteReverse(input), bits.Reverse8)
+	return UnaryOp(input, bits.Reverse8)
 }
 
 // Returns the binary string representation of the bytes
@@ -273,6 +279,14 @@ func Nbits(input []byte) []byte {
 	return uint64ToBytes(nbitsAsUint64(input))
 }
 
+// Returns the input with the nibble order reversed
+// Leading zeros in the output (due to trailing zeros in the input) are NOT removed
+func NibbleSwap(input []byte) []byte {
+	return UnaryOp(input, func(a byte) byte {
+		return ((a & 0xf) << 4) | ((a & 0xf0) >> 4)
+	})
+}
+
 // Returns ~a
 func Not(input []byte) []byte {
 	return UnaryOp(input, func(ai byte) byte { return byte(0xff - int(ai)) })
@@ -374,7 +388,7 @@ func ShiftLeft(a, b []byte) []byte {
 
 // Returns a << b
 func ShiftRight(a, b []byte) []byte {
-	return BitReverse(ShiftLeft(BitReverse(a), b))
+	return BitstringReverse(ShiftLeft(BitstringReverse(a), b))
 }
 
 // Parses the input string to a byte array
