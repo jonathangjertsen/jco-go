@@ -1,44 +1,26 @@
 package ops
 
-// Returns whichever is greatest of a and b
-func intmax(a, b int) int {
-	if a > b {
-		return a
-	} else {
-		return b
-	}
-}
-
-// Returns whichever is smallest of a and b
-func intmin(a, b int) int {
-	if a < b {
-		return a
-	} else {
-		return b
-	}
-}
-
-// Returns whichever is greatest of a and b
-func uintmax(a, b uint) uint {
-	if a > b {
-		return a
-	} else {
-		return b
-	}
-}
-
-// Returns whichever is smallest of a and b
-func uintmin(a, b uint) uint {
-	if a < b {
-		return a
-	} else {
-		return b
-	}
-}
-
 // Returns the number of bytes required to hold the number of bits
 func BitsToBytes(bits uint64) uint64 {
 	return (bits + 7) / 8
+}
+
+// Returns whichever is greatest of a and b
+func Intmax(a, b int) int {
+	if a > b {
+		return a
+	} else {
+		return b
+	}
+}
+
+// Returns whichever is smallest of a and b
+func Intmin(a, b int) int {
+	if a < b {
+		return a
+	} else {
+		return b
+	}
 }
 
 // Returns the number of bits needed to represent the input
@@ -68,4 +50,22 @@ func NBitsUint64(input uint64) uint64 {
 // Returns the number of bytes needed to represent the input
 func NBytesUint64(input uint64) uint64 {
 	return BitsToBytes(NBitsUint64(input))
+}
+
+// Returns whichever is greatest of a and b
+func Uintmax(a, b uint) uint {
+	if a > b {
+		return a
+	} else {
+		return b
+	}
+}
+
+// Returns whichever is smallest of a and b
+func Uintmin(a, b uint) uint {
+	if a < b {
+		return a
+	} else {
+		return b
+	}
 }

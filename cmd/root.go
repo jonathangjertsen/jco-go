@@ -75,31 +75,6 @@ func parseFlags(args []string) *Flags {
 	return &flags
 }
 
-func Version() {
-	fmt.Printf("jco %s", VERSION)
-}
-
-func Usage() {
-	fmt.Printf(`jco (Jonathan's converter) %s
-
-Usage:
-	Show information about <number>
-		jco <number>
-
-	Show information about how <number1> and <number2> relate
-		jco <number1> <number2>
-
-	Like the above, but treat numbers as 16-bit
-		jco <number1> <number2> -b 16
-
-	Show this help screen
-		jco --help
-
-	Show one-liner version
-		jco --version
-`, VERSION)
-}
-
 func Execute() {
 	args := os.Args[1:]
 	flags := parseFlags(args)
@@ -140,4 +115,29 @@ func Fatal(message string) {
 
 func Interactive() {
 	fmt.Printf("Interactive")
+}
+
+func Usage() {
+	fmt.Printf(`jco (Jonathan's converter) %s
+
+Usage:
+	Show information about <number>
+		jco <number>
+
+	Show information about how <number1> and <number2> relate
+		jco <number1> <number2>
+
+	Like the above, but treat numbers as 16-bit
+		jco <number1> <number2> -b 16
+
+	Show this help screen
+		jco --help
+
+	Show one-liner version
+		jco --version
+`, VERSION)
+}
+
+func Version() {
+	fmt.Printf("jco %s", VERSION)
 }

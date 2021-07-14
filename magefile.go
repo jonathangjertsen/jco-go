@@ -3,8 +3,9 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
+	"os"
+	"os/exec"
 	"runtime"
 	"strings"
 	"sync"
@@ -19,21 +20,26 @@ const (
 )
 
 var (
-	RELEASE_FLAGS = []string{"-tags", "release", "-ldflags=-s", "-ldflags=-w"}
-	NO_ARGS       = []string{}
-	NO_ENV        = map[string]string{}
+	RELEASE_FLAGS = []string{
+		"-tags", "release", // Set the release build tag
+		"-ldflags=-s -w",                  // Strip debug info
+		"-gcflags=all=-l -B -wb=false -C", // Disable function inlining to reduce size (and also speed, but it's plenty fast anyway)
+	}
+	NO_ARGS = []string{}
+	NO_ENV  = []string{}
 )
 
-func build(os, arch, executable string, args []string) error {
+func build(os, arch, executable string) error {
 	command := []string{
 		"build",
 		"-o", executablePath(os, arch, executable),
 	}
-	command = append(command, args...)
+	command = append(command, RELEASE_FLAGS...)
 	command = append(command, ".")
-	output, err := run("go", command, map[string]string{
-		"GOOS":   os,
-		"GOARCH": arch,
+	output, err := run("go", command, []string{
+		fmt.Sprintf("GOOS=%s", os),
+		fmt.Sprintf("GOARCH=%s", arch),
+		"GOGC=off",
 	})
 	fmt.Print(output)
 	return err
@@ -75,28 +81,19 @@ func parallelBuild(builders [](func() error)) {
 	wg.Wait()
 }
 
-func run(program string, args []string, env map[string]string) (string, error) {
+func run(program string, args []string, env []string) (string, error) {
 	// Make string representation of command
 	fullArgs := append([]string{program}, args...)
 	cmdStr := strings.Join(fullArgs, " ")
 
-	// Make string representation of environment
-	envStrBuf := new(bytes.Buffer)
-	for key, value := range env {
-		fmt.Fprintf(envStrBuf, "%s=\"%s\", ", key, value)
-	}
-	envStr := string(bytes.TrimRight(envStrBuf.Bytes(), ", "))
-
 	// Show info
-	fmt.Println("Running '" + cmdStr + "'" + " with env " + envStr)
+	fmt.Printf("Running %s with env %v\n", cmdStr, env)
 
 	// Run
-	return sh.OutputWith(env, program, args...)
-}
-
-// Builds an executable for this computer
-func Build() error {
-	return build(runtime.GOOS, runtime.GOARCH, EXE, RELEASE_FLAGS)
+	cmd := exec.Command(program, args...)
+	cmd.Env = append(os.Environ(), env...)
+	output, err := cmd.CombinedOutput()
+	return string(output), err
 }
 
 // Builds an executable for all supported platforms
@@ -112,27 +109,27 @@ func BuildAll() {
 
 // Builds an executable for Linux AMD64
 func BuildLinuxAmd64() error {
-	return build("linux", "amd64", EXE, RELEASE_FLAGS)
+	return build("linux", "amd64", EXE)
 }
 
 // Builds an executable for Linux ARM64
 func BuildLinuxArm64() error {
-	return build("linux", "arm64", EXE, RELEASE_FLAGS)
+	return build("linux", "arm64", EXE)
 }
 
 // Builds an executable for Mac AMD64
 func BuildMacAmd64() error {
-	return build("darwin", "amd64", EXE, RELEASE_FLAGS)
+	return build("darwin", "amd64", EXE)
 }
 
 // Builds an executable for Mac ARM64
 func BuildMacArm64() error {
-	return build("darwin", "arm64", EXE, RELEASE_FLAGS)
+	return build("darwin", "arm64", EXE)
 }
 
 // Builds an executable for Windows AMD64
 func BuildWindowsAmd64() error {
-	return build("windows", "amd64", EXE, RELEASE_FLAGS)
+	return build("windows", "amd64", EXE)
 }
 
 // Runs go vet and go fmt, and checks that they don't say anything
@@ -193,7 +190,6 @@ func Ci() {
 	mg.Deps(Test)
 	mg.Deps(TestExtensively)
 	mg.Deps(BuildAll)
-	mg.Deps(Run)
 	mg.Deps(RunRelease)
 	mg.Deps(Release)
 	color.HiGreen("All CI steps passed")
@@ -210,11 +206,6 @@ func Clean() error {
 		return err
 	}
 	return nil
-}
-
-// Builds a debug executable for this computer
-func Debug() error {
-	return build(runtime.GOOS, runtime.GOARCH, fmt.Sprintf("%s.debug", EXE), []string{"-tags", "debug"})
 }
 
 // Generates release build artifacts
@@ -235,25 +226,13 @@ func Release() error {
 	return nil
 }
 
-// Runs the program in debug mode without arguments
-func Run() error {
-	mg.Deps(Debug)
-	output, err := run(
-		executablePath(runtime.GOOS, runtime.GOARCH, fmt.Sprintf("%s.debug", EXE)),
-		[]string{"0x4aefae", "0xc", "-b", "24"},
-		map[string]string{},
-	)
-	fmt.Print(output)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 // Runs the program in release mode without arguments
 func RunRelease() error {
-	mg.Deps(Build)
-	output, err := run(executablePath(runtime.GOOS, runtime.GOARCH, EXE), NO_ARGS, NO_ENV)
+	output, err := run(
+		executablePath(runtime.GOOS, runtime.GOARCH, EXE),
+		[]string{"0x4aefae", "0xc", "-b", "24"},
+		[]string{},
+	)
 	fmt.Print(output)
 	if err != nil {
 		return err

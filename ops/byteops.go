@@ -304,7 +304,7 @@ func Popcount(input []byte) []byte {
 // Prepends n zeros to the slice
 // n is capped at MAX_SLICE_SIZE to avoid running out of memory
 func PrependZeros(slice []byte, n uint) []byte {
-	return append(make([]byte, uintmin(n, MAX_SLICE_SIZE)), slice...)
+	return append(make([]byte, Uintmin(n, MAX_SLICE_SIZE)), slice...)
 }
 
 // Returns whether the len(right) last bytes of left are equal to right
