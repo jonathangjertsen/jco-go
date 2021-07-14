@@ -22,10 +22,6 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: bin
+          name: binaries
           path: |
-            bin/darwin-amd64
-            bin/darwin-arm64
-            bin/linux-amd64
-            bin/linux-arm64
-            bin/windows-amd64
+            release

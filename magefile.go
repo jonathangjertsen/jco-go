@@ -18,6 +18,12 @@ const (
 	EXE = "jco"
 )
 
+var (
+	RELEASE_FLAGS = []string{"-tags", "release", "-ldflags=-s", "-ldflags=-w"}
+	NO_ARGS       = []string{}
+	NO_ENV        = map[string]string{}
+)
+
 func build(os, arch, executable string, args []string) error {
 	command := []string{
 		"build",
@@ -90,7 +96,7 @@ func run(program string, args []string, env map[string]string) (string, error) {
 
 // Builds an executable for this computer
 func Build() error {
-	return build(runtime.GOOS, runtime.GOARCH, EXE, []string{"-tags", "release"})
+	return build(runtime.GOOS, runtime.GOARCH, EXE, RELEASE_FLAGS)
 }
 
 // Builds an executable for all supported platforms
@@ -101,38 +107,37 @@ func BuildAll() {
 		BuildMacArm64,
 		BuildLinuxAmd64,
 		BuildLinuxArm64,
-		Debug,
 	})
 }
 
 // Builds an executable for Linux AMD64
 func BuildLinuxAmd64() error {
-	return build("linux", "amd64", EXE, []string{"-tags", "release"})
+	return build("linux", "amd64", EXE, RELEASE_FLAGS)
 }
 
 // Builds an executable for Linux ARM64
 func BuildLinuxArm64() error {
-	return build("linux", "arm64", EXE, []string{"-tags", "release"})
+	return build("linux", "arm64", EXE, RELEASE_FLAGS)
 }
 
 // Builds an executable for Mac AMD64
 func BuildMacAmd64() error {
-	return build("darwin", "amd64", EXE, []string{"-tags", "release"})
+	return build("darwin", "amd64", EXE, RELEASE_FLAGS)
 }
 
 // Builds an executable for Mac ARM64
 func BuildMacArm64() error {
-	return build("darwin", "arm64", EXE, []string{"-tags", "release"})
+	return build("darwin", "arm64", EXE, RELEASE_FLAGS)
 }
 
 // Builds an executable for Windows AMD64
 func BuildWindowsAmd64() error {
-	return build("windows", "amd64", EXE, []string{"-tags", "release"})
+	return build("windows", "amd64", EXE, RELEASE_FLAGS)
 }
 
 // Runs go vet and go fmt, and checks that they don't say anything
 func Check() error {
-	output, err := run("go", []string{"vet", "./..."}, map[string]string{})
+	output, err := run("go", []string{"vet", "./..."}, NO_ENV)
 	if err != nil {
 		return err
 	}
@@ -140,7 +145,7 @@ func Check() error {
 		return fmt.Errorf("go vet says something:\n%s", output)
 	}
 
-	output, err = run("go", []string{"fmt", "./..."}, map[string]string{})
+	output, err = run("go", []string{"fmt", "./..."}, NO_ENV)
 	if err != nil {
 		return err
 	}
@@ -148,15 +153,15 @@ func Check() error {
 		return fmt.Errorf("go fmt says something:\n%s", output)
 	}
 
-	output, err = run("python", []string{"--version"}, map[string]string{})
+	output, err = run("python", []string{"--version"}, NO_ENV)
 	if err != nil {
 		fmt.Printf("Python not found, skipping")
 	} else {
-		output, err = run("python", []string{"tools/sort_functions.py", "all"}, map[string]string{})
+		output, err = run("python", []string{"tools/sort_functions.py", "all"}, NO_ENV)
 		if err != nil {
 			fmt.Printf("Error in sort_functions.py dry run")
 		} else {
-			output, err = run("python", []string{"tools/sort_functions.py", "all", "--mode=in-place"}, map[string]string{})
+			output, err = run("python", []string{"tools/sort_functions.py", "all", "--mode=in-place"}, NO_ENV)
 			if err != nil {
 				fmt.Printf("Error in sort_functions.py in-place, the whole thing might be jacked")
 				return err
@@ -171,7 +176,7 @@ func Check() error {
 
 // Checks that the repo is clean
 func CheckRepoClean() error {
-	output, err := run("git", []string{"status", "--porcelain"}, map[string]string{})
+	output, err := run("git", []string{"status", "--porcelain"}, NO_ENV)
 	if err != nil {
 		return err
 	}
@@ -190,18 +195,44 @@ func Ci() {
 	mg.Deps(BuildAll)
 	mg.Deps(Run)
 	mg.Deps(RunRelease)
+	mg.Deps(Release)
 	color.HiGreen("All CI steps passed")
 }
 
 // Cleans the bin directory
 func Clean() error {
 	fmt.Println("Removing bin")
-	return sh.Rm("bin")
+	if err := sh.Rm("bin"); err != nil {
+		return err
+	}
+	fmt.Println("Removing release")
+	if err := sh.Rm("release"); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Builds a debug executable for this computer
 func Debug() error {
 	return build(runtime.GOOS, runtime.GOARCH, fmt.Sprintf("%s.debug", EXE), []string{"-tags", "debug"})
+}
+
+// Generates release build artifacts
+func Release() error {
+	mg.Deps(BuildAll)
+
+	_, err := run("python", []string{"--version"}, NO_ENV)
+	if err != nil {
+		fmt.Printf("Python not found, skipping")
+		return err
+	}
+	output, err := run("python", []string{"tools/make_release.py"}, NO_ENV)
+	if err != nil {
+		fmt.Printf("Error while creating a release")
+		return err
+	}
+	fmt.Println(output)
+	return nil
 }
 
 // Runs the program in debug mode without arguments
@@ -222,7 +253,7 @@ func Run() error {
 // Runs the program in release mode without arguments
 func RunRelease() error {
 	mg.Deps(Build)
-	output, err := run(executablePath(runtime.GOOS, runtime.GOARCH, EXE), []string{}, map[string]string{})
+	output, err := run(executablePath(runtime.GOOS, runtime.GOARCH, EXE), NO_ARGS, NO_ENV)
 	fmt.Print(output)
 	if err != nil {
 		return err
@@ -232,14 +263,14 @@ func RunRelease() error {
 
 // Runs go test in verbose mode and prettifies the output
 func Test() error {
-	output, err := run("go", []string{"test", "-v", "./..."}, map[string]string{})
+	output, err := run("go", []string{"test", "-v", "./..."}, NO_ENV)
 	emitFixedTestOutput(output)
 	return err
 }
 
 // Runs go test many times and prettifies the output
 func TestExtensively() error {
-	output, err := run("go", []string{"test", "./...", "-count=1000"}, map[string]string{})
+	output, err := run("go", []string{"test", "./...", "-count=1000"}, NO_ENV)
 	emitFixedTestOutput(output)
 	return err
 }
